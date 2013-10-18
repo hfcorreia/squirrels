@@ -1,42 +1,78 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define MAX 10
 #define SQUIRREL 1
 #define WOLF 2
 #define TREE 3
 #define ICE 4
 
-struct world {
+typedef struct world {
 	int type; //char
 	int breeding_period;
 	int starvation_period;
-} world[MAX][MAX];
+} world;
 
-void print_matrix() {
+typedef struct position_info {
+	int pos_x;
+	int pos_y;
+	char entity;
+} position_info;
+
+// GLOBAL variable!!!
+world*** animal_world;
+
+
+/* prints the matrix state */
+void print_matrix(int world_size) {
 	int i, j;
-	for(i = 0; i < MAX; i++) {
-		for(j = 0; j < MAX; j++) {
-			printf("%d", world[i][j].type);
+	for(i = 0; i < world_size; i++) {
+		for(j = 0; j < world_size; j++) {
+			printf("%d", animal_world[i][j]->type);
+			free(animal_world[i][j]);
 		}
 		printf("\n");
+		free(animal_world[i]);
+	}
+	free(animal_world);
+}
+
+/* allocation */
+void initialization(int world_size) {
+	int i, j;
+	animal_world = (world***)malloc(sizeof(world**)*world_size);
+
+	for (i = 0; i < world_size; i++)
+	{
+		animal_world[i] = (world**)malloc(sizeof(world*)*world_size);
+		for (j = 0; j < world_size; j++)
+		{
+			animal_world[i][j] = (world*)malloc(sizeof(world));
+		}
 	}
 }
 
-void genesis(int world_x, int world_y, char entity) {
-	int entity_number;
+/* fills the matrix with entities */
+void genesis(position_info** pos_info, int wolves_breeding_period, int squirrels_breeding_period, int wolf_starvation_period) {
+	int i, entity_number;
 
-	switch(entity) {
-		case 's': entity_number = SQUIRREL;
-		break;
-		case 'w': entity_number = WOLF;
-		break;
-		case 't': entity_number = TREE;
-		break;
-		case 'i': entity_number = ICE;
-		break;
+	for(i = 0; pos_info[i] != NULL; i++) {
+		switch(pos_info[i]->entity) {
+			case 's': entity_number = SQUIRREL;
+			animal_world[pos_info[i]->pos_x][pos_info[i]->pos_y]->breeding_period = squirrels_breeding_period;
+			break;
+			case 'w': entity_number = WOLF;
+			animal_world[pos_info[i]->pos_x][pos_info[i]->pos_y]->breeding_period = wolves_breeding_period;
+			animal_world[pos_info[i]->pos_x][pos_info[i]->pos_y]->starvation_period = wolf_starvation_period;
+			break;
+			case 't': entity_number = TREE;
+			break;
+			case 'i': entity_number = ICE;
+			break;
+		}
+		animal_world[pos_info[i]->pos_x][pos_info[i]->pos_y]->type = entity_number;
+		free(pos_info[i]);
 	}
-	world[world_x][world_y].type = entity_number;
+	free(pos_info);
 
 }
 
@@ -45,29 +81,39 @@ int main(int argc, char *argv[]){
 
 	int world_size, wolves_breeding_period, squirrels_breeding_period, 
 	wolf_starvation_period, number_generations;
+	int world_x, world_y, info_index;
+	char entity;
+	position_info** pos_info;
 	FILE * fp;
 
 	fp = fopen(argv[1], "r");
 
 	fscanf(fp, "%d", &world_size);
 
+	pos_info = (position_info**)malloc(sizeof(position_info*)*world_size*world_size);
+
 	printf("%d\n", world_size);
 
-	int world_x, world_y;
-	char entity;
+	initialization(world_size);
 
-	while (fscanf(fp, "%d %d %c",&world_x,&world_y,&entity) != EOF){ // expect 1 successful conversion
-		printf("world-x%d world-y%d entity-%c\n", world_x, world_y, entity);
+	info_index = 0;
+	while (fscanf(fp, "%d %d %c",&world_x, &world_y, &entity) != EOF){ // expect 1 successful conversion
 
-		genesis(world_x, world_y, entity);
+		pos_info[info_index] = (position_info*)malloc(sizeof(position_info));
+		pos_info[info_index]->pos_x = world_x;
+		pos_info[info_index]->pos_y = world_y;
+		pos_info[info_index++]->entity = entity;
+
 	}
 	
 	scanf("%d", &wolves_breeding_period);
 	scanf("%d", &squirrels_breeding_period);
 	scanf("%d", &wolf_starvation_period);
 	scanf("%d", &number_generations);
+	
+	genesis(pos_info, wolves_breeding_period, squirrels_breeding_period, wolf_starvation_period);
 
-	print_matrix();
+	print_matrix(world_size);
 
 	return 0;
 }
