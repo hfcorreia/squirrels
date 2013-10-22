@@ -79,39 +79,37 @@ void genesis(position_info** pos_info, int wolves_breeding_period, int squirrels
 int main(int argc, char *argv[]){
 	printf("Welcome to Squirrels and Wolves\n");
 
-	int world_size, wolves_breeding_period, squirrels_breeding_period, 
-	wolf_starvation_period, number_generations;
-	int world_x, world_y, info_index;
+	int world_size, world_x, world_y, entity_number;
 	char entity;
-	position_info** pos_info;
 	FILE * fp;
 
 	fp = fopen(argv[1], "r");
 
 	fscanf(fp, "%d", &world_size);
 
-	pos_info = (position_info**)malloc(sizeof(position_info*)*world_size*world_size);
-
 	printf("%d\n", world_size);
 
 	initialization(world_size);
 
-	info_index = 0;
 	while (fscanf(fp, "%d %d %c",&world_x, &world_y, &entity) != EOF){ // expect 1 successful conversion
 
-		pos_info[info_index] = (position_info*)malloc(sizeof(position_info));
-		pos_info[info_index]->pos_x = world_x;
-		pos_info[info_index]->pos_y = world_y;
-		pos_info[info_index++]->entity = entity;
+		switch(entity) {
+			case 's': entity_number = SQUIRREL;
+			animal_world[world_x][world_y]->breeding_period = atoi(argv[3]);
+			break;
+			case 'w': entity_number = WOLF;
+			animal_world[world_x][world_y]->breeding_period = atoi(argv[2]);
+			animal_world[world_x][world_y]->starvation_period = atoi(argv[3]);
+			break;
+			case 't': entity_number = TREE;
+			break;
+			case 'i': entity_number = ICE;
+			break;
+		}
+		animal_world[world_x][world_y]->type = entity_number;
 
 	}
-	
-	scanf("%d", &wolves_breeding_period);
-	scanf("%d", &squirrels_breeding_period);
-	scanf("%d", &wolf_starvation_period);
-	scanf("%d", &number_generations);
-	
-	genesis(pos_info, wolves_breeding_period, squirrels_breeding_period, wolf_starvation_period);
+	//genesis(pos_info, wolves_breeding_period, squirrels_breeding_period, wolf_starvation_period);
 
 	print_matrix(world_size);
 
