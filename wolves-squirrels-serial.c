@@ -141,7 +141,7 @@ void move(int num_generation, int type, int x, int y) {
       sum++;
     }
 
-    if( sum == 0){
+    if( sum == 0 ){
       if(animal_world[x][y]->breeding_flag < num_generation) {
         if(animal_world[x][y]->breeding_period > 0) {
           animal_world[x][y]->breeding_period--;
@@ -153,7 +153,11 @@ void move(int num_generation, int type, int x, int y) {
       next = c % sum;
 
       if(animal_world[x][y]->breeding_period == 0 ) {
-        update_position(x, y, SQUIRREL, squirrel_breeding, num_generation, 0, 0);
+        if(type == SQUIRREL_TREE){
+          update_position(x, y, SQUIRREL_TREE, squirrel_breeding, num_generation, 0, 0);
+        } else {
+          update_position(x, y, SQUIRREL, squirrel_breeding, num_generation, 0, 0);
+        }
         if(array[next].on_tree) {
           update_position(array[next].x, array[next].y, SQUIRREL_TREE, squirrel_breeding, num_generation, 0, 0);
         }
@@ -169,10 +173,10 @@ void move(int num_generation, int type, int x, int y) {
           update_position(array[next].x, array[next].y, SQUIRREL, animal_world[x][y]->breeding_period - 1, num_generation, 0, 0);
         }
         if(type == SQUIRREL_TREE) {
-        update_position(x,y, TREE, 0, 0, 0, 0);
+          update_position(x,y, TREE, 0, 0, 0, 0);
         }
         else {
-        update_position(x,y, EMPTY, 0, 0, 0, 0);
+          update_position(x,y, EMPTY, 0, 0, 0, 0);
         }
       }
     }
@@ -299,8 +303,6 @@ void exodus(int num_generation, int x, int y){
     case SQUIRREL_TREE:
       move(num_generation, SQUIRREL_TREE, x, y);
       break;
-
-      /* Dollar my friends */
   }
 }
 
@@ -352,14 +354,16 @@ int main(int argc, char *argv[]) {
   genesis( fopen(argv[1], "r"), wolf_breeding, squirrel_breeding, wolf_starvation);
 
   while( num_generation > 0 ) {
-    print_matrix(world_size);
-    printf("Red: \n");
+    printf("RED:\n");
     red_revelation(num_generation);
     print_matrix(world_size);
-    printf("Black: \n");
+    printf("BLACK:\n");
     black_lamentation(num_generation);
+    print_matrix(world_size);
     num_generation--;
   }
+  printf("Final:\n");
+  print_matrix(world_size);
 
   return 0;
 }
