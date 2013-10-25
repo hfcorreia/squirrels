@@ -24,6 +24,7 @@ typedef struct pos_move {
 
 // GLOBAL variable!!!
 world*** animal_world;
+world*** animal_world_aux;
 int world_size;
 int wolf_breeding;
 int squirrel_breeding;
@@ -35,10 +36,22 @@ void print_matrix(int world_size) {
   for(i = 0; i < world_size; i++) {
     for(j = 0; j < world_size; j++) {
       if(animal_world[i][j]->type != SQUIRREL_TREE) {
-      printf("%d ", animal_world[i][j]->type);
+        printf("%d ", animal_world[i][j]->type);
       }
       else {
-      printf("$ ");
+        printf("$ ");
+      }
+    }
+    printf("\n");
+  }
+  printf("AUX\n");
+  for(i = 0; i < world_size; i++) {
+    for(j = 0; j < world_size; j++) {
+      if(animal_world_aux[i][j]->type != SQUIRREL_TREE) {
+        printf("%d ", animal_world_aux[i][j]->type);
+      }
+      else {
+        printf("$ ");
       }
     }
     printf("\n");
@@ -49,13 +62,17 @@ void print_matrix(int world_size) {
 void initialization(int world_size) {
   int i, j;
   animal_world = (world***)malloc(sizeof(world**)*world_size);
+  animal_world_aux = (world***)malloc(sizeof(world**)*world_size);
 
   for (i = 0; i < world_size; i++)
   {
     animal_world[i] = (world**)malloc(sizeof(world*)*world_size);
+    animal_world_aux[i] = (world**)malloc(sizeof(world*)*world_size);
+
     for (j = 0; j < world_size; j++)
     {
       animal_world[i][j] = (world*)malloc(sizeof(world));
+      animal_world_aux[i][j] = (world*)malloc(sizeof(world));
     }
   }
 }
@@ -75,29 +92,40 @@ void genesis(FILE *fp, int wolves_breeding_period, int squirrels_breeding_period
         entity_number = SQUIRREL;
         animal_world[world_x][world_y]->breeding_period = squirrels_breeding_period;
         animal_world[world_x][world_y]->starvation_period = 0;
+        animal_world_aux[world_x][world_y]->breeding_period = squirrels_breeding_period;
+        animal_world_aux[world_x][world_y]->starvation_period = 0;
         break;
       case 'w': 
         entity_number = WOLF;
         animal_world[world_x][world_y]->breeding_period = wolves_breeding_period;
         animal_world[world_x][world_y]->starvation_period = wolves_starvation_period;
+        animal_world_aux[world_x][world_y]->breeding_period = wolves_breeding_period;
+        animal_world_aux[world_x][world_y]->starvation_period = wolves_starvation_period;
         break;
       case 't': 
         entity_number = TREE;
         animal_world[world_x][world_y]->breeding_period = 0;
         animal_world[world_x][world_y]->starvation_period = 0;
+        animal_world_aux[world_x][world_y]->breeding_period = 0;
+        animal_world_aux[world_x][world_y]->starvation_period = 0;
         break;
       case 'i': 
         entity_number = ICE;
         animal_world[world_x][world_y]->breeding_period = 0;
         animal_world[world_x][world_y]->starvation_period = 0;
+        animal_world_aux[world_x][world_y]->breeding_period = 0;
+        animal_world_aux[world_x][world_y]->starvation_period = 0;
         break;
       default:
         entity_number = EMPTY;
         animal_world[world_x][world_y]->breeding_period = 0;
         animal_world[world_x][world_y]->starvation_period = 0;
+        animal_world_aux[world_x][world_y]->breeding_period = 0;
+        animal_world_aux[world_x][world_y]->starvation_period = 0;
         break;
     }
     animal_world[world_x][world_y]->type = entity_number;
+    animal_world_aux[world_x][world_y]->type = entity_number;
   }
 }
 
@@ -350,17 +378,24 @@ int main(int argc, char *argv[]) {
   squirrel_breeding = atoi(argv[3]);
   wolf_starvation = atoi(argv[4]);
   int num_generation = atoi(argv[5]);
-
+  world*** temp;
   genesis( fopen(argv[1], "r"), wolf_breeding, squirrel_breeding, wolf_starvation);
 
   while( num_generation > 0 ) {
-    printf("RED:\n");
-    red_revelation(num_generation);
-    print_matrix(world_size);
-    printf("BLACK:\n");
-    black_lamentation(num_generation);
-    print_matrix(world_size);
+//    printf("RED:\n");
+//    red_revelation(num_generation);
+//    temp = animal_world;
+//    animal_world = animal_world_aux;
+//    animal_world_aux =  temp;
+   // print_matrix(world_size);
+  //  printf("BLACK:\n");
+//    black_lamentation(num_generation);
     num_generation--;
+//    temp = animal_world;
+//    animal_world = animal_world_aux;
+//    animal_world_aux =  temp;;
+   // print_matrix(world_size);
+    
   }
   printf("Final:\n");
   print_matrix(world_size);
