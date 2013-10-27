@@ -24,11 +24,10 @@ typedef struct pos_move {
 } pos_move;
 
 // GLOBAL variable!!!
-world*** animal_world_read;
-world*** animal_world_write;
-
 world* animal_world_array;
 world** animal_world_indexer;
+world* animal_world_array_read;
+world** animal_world_indexer_read;
 
 int world_size;
 int wolf_breeding;
@@ -37,6 +36,7 @@ int wolf_starvation;
 
 void print_matrix(int world_size) {
 	int i, j;
+	printf("\nWRITE\n");
 	for(i = 0; i < world_size; i++) {
 		for(j = 0; j < world_size; j++) {
 			if(animal_world_indexer[i][j].type != SQUIRREL_TREE) {
@@ -47,7 +47,43 @@ void print_matrix(int world_size) {
 			}
 		}
 		printf("\n");
+
 	}
+	printf("\nREAD\n");
+	for(i = 0; i < world_size; i++) {
+		for(j = 0; j < world_size; j++) {
+			if(animal_world_indexer_read[i][j].type != SQUIRREL_TREE) {
+				printf("%d ", animal_world_indexer_read[i][j].type);
+			}
+			else {
+				printf("$ ");
+			}
+		}
+		printf("\n");
+	}
+}
+
+void copy_matrix(int world_size) {
+	int i, j;
+	animal_world_array_read = (world*)malloc(sizeof(world)*world_size*world_size);
+	animal_world_indexer_read = (world**)malloc(sizeof(world*)*world_size);
+
+	for (i = 0; i < world_size; ++i)
+	{
+		animal_world_indexer_read[i] = &animal_world_array_read[i*world_size];
+	}
+
+	for (i = 0; i < world_size; ++i)
+	{
+		for(j = 0; j < world_size; ++j) {
+			animal_world_indexer_read[i][j].type = animal_world_indexer[i][j].type;
+			animal_world_indexer_read[i][j].breeding_period = animal_world_indexer[i][j].breeding_period;
+			animal_world_indexer_read[i][j].starvation_period = animal_world_indexer[i][j].starvation_period;
+			animal_world_indexer_read[i][j].breeding_flag = animal_world_indexer[i][j].breeding_flag;
+			animal_world_indexer_read[i][j].starvation_flag = animal_world_indexer[i][j].starvation_flag;
+		}
+	}
+
 }
 
 /* allocation */
@@ -106,11 +142,43 @@ void genesis(FILE *fp, int wolves_breeding_period, int squirrels_breeding_period
 }
 
 void update_position(int x, int y, int type, int breeding, int breeding_flag, int starvation, int starvation_flag){
-	animal_world_indexer[x][y].type = type;
-	animal_world_indexer[x][y].breeding_period = breeding;
+
+	// Animais do mesmo tipo
+	if(animal_world_indexer[x][y].type == type) {
+		if(type == WOLF) {
+			// O lobo que se move para a posicao tem maior starvation period e ganha.
+			if (starvation > animal_world_indexer[x][y].starvation_period)
+			{
+				animal_world_indexer[x][y].starvation_period = starvation;
+				animal_world_indexer[x][y].breeding_period = breeding;
+			}
+			// Os lobos tem o mesmo starvation period
+			else if (animal_world_indexer[x][y].starvation_period == starvation) {
+				animal_world_indexer[x][y].breeding_period = animal_world_indexer[x][y].breeding_period <= breeding ? animal_world_indexer[x][y].breeding_period : breeding;
+			}
+			// Se o lobo que ja esta na posicao tem maior starvation period, nada se altera
+
+		// Squirrel with a breeding period wins
+		} else if(type == SQUIRREL || type == SQUIRREL_TREE) {
+			animal_world_indexer[x][y].breeding_period = animal_world_indexer[x][y].breeding_period <= breeding ? animal_world_indexer[x][y].breeding_period : breeding;
+		}
+	}
+	// Suicidal squirrel jumps to the wolfs' mouth
+	else if ((animal_world_indexer[x][y].type == WOLF && type == SQUIRREL)) {
+		animal_world_indexer[x][y].starvation_period = wolf_starvation;
+	}
+	// Lucky wolf eats a squirrel
+	else if (animal_world_indexer[x][y].type == SQUIRREL && type == WOLF) {
+		animal_world_indexer[x][y].type = WOLF;
+		animal_world_indexer[x][y].starvation_period = wolf_starvation;
+	// Moves to an empty position
+	} else {
+		animal_world_indexer[x][y].type = type;
+		animal_world_indexer[x][y].breeding_period = breeding;
+		animal_world_indexer[x][y].starvation_period = starvation;
+	}
 	animal_world_indexer[x][y].breeding_flag = breeding_flag;
 	animal_world_indexer[x][y].starvation_flag = starvation_flag;
-	animal_world_indexer[x][y].starvation_period = starvation;
 }
 
 void move(int num_generation, int type, int x, int y) {
@@ -120,34 +188,34 @@ void move(int num_generation, int type, int x, int y) {
 	// Oh bia, aqui ficam os teus esquilinhos, eventualmente aquele que o hugo te vai dar
 	if( type == SQUIRREL || type == SQUIRREL_TREE) {
 		sum = 0;
-		if((y - 1 >= 0 ) && (animal_world_indexer[x][y-1].type == EMPTY || animal_world_indexer[x][y-1].type == TREE)) {
+		if((y - 1 >= 0 ) && (animal_world_indexer_read[x][y-1].type == EMPTY || animal_world_indexer_read[x][y-1].type == TREE)) {
 			array[sum].x=x;
 			array[sum].y=y-1;
-			array[sum].on_tree = animal_world_indexer[x][y-1].type == TREE ? 1 : 0;
+			array[sum].on_tree = animal_world_indexer_read[x][y-1].type == TREE ? 1 : 0;
 			sum++;
 		}
-		if((x + 1 < world_size) && (animal_world_indexer[x+1][y].type == EMPTY || animal_world_indexer[x+1][y].type == TREE)) {
+		if((x + 1 < world_size) && (animal_world_indexer_read[x+1][y].type == EMPTY || animal_world_indexer_read[x+1][y].type == TREE)) {
 			array[sum].x=x+1;
 			array[sum].y=y;
-			array[sum].on_tree = animal_world_indexer[x+1][y].type == TREE ? 1 : 0;
+			array[sum].on_tree = animal_world_indexer_read[x+1][y].type == TREE ? 1 : 0;
 			sum++;
 		}
-		if((y + 1 < world_size) && (animal_world_indexer[x][y+1].type == EMPTY || animal_world_indexer[x][y+1].type == TREE)) {
+		if((y + 1 < world_size) && (animal_world_indexer_read[x][y+1].type == EMPTY || animal_world_indexer_read[x][y+1].type == TREE)) {
 			array[sum].x=x;
 			array[sum].y=y+1;
-			array[sum].on_tree = animal_world_indexer[x][y+1].type == TREE ? 1 : 0;
+			array[sum].on_tree = animal_world_indexer_read[x][y+1].type == TREE ? 1 : 0;
 			sum++;
 		}
-		if((x - 1 >= 0) && (animal_world_indexer[x-1][y].type == EMPTY || animal_world_indexer[x-1][y].type == TREE)) {
+		if((x - 1 >= 0) && (animal_world_indexer_read[x-1][y].type == EMPTY || animal_world_indexer_read[x-1][y].type == TREE)) {
 			array[sum].x=x-1;
 			array[sum].y=y;
-			array[sum].on_tree = animal_world_indexer[x-1][y].type == TREE ? 1 : 0;
+			array[sum].on_tree = animal_world_indexer_read[x-1][y].type == TREE ? 1 : 0;
 			sum++;
 		}
 
 		if( sum == 0 ){
-			if(animal_world_indexer[x][y].breeding_flag < num_generation) {
-				if(animal_world_indexer[x][y].breeding_period > 0) {
+			if(animal_world_indexer_read[x][y].breeding_flag < num_generation) {
+				if(animal_world_indexer_read[x][y].breeding_period > 0) {
 					animal_world_indexer[x][y].breeding_period--;
 				}
 				animal_world_indexer[x][y].breeding_flag = num_generation;
@@ -156,7 +224,7 @@ void move(int num_generation, int type, int x, int y) {
 			c = x * world_size + y;
 			next = c % sum;
 
-			if(animal_world_indexer[x][y].breeding_period == 0 ) {
+			if(animal_world_indexer_read[x][y].breeding_period == 0 ) {
 				if(type == SQUIRREL_TREE){
 					update_position(x, y, SQUIRREL_TREE, squirrel_breeding, num_generation, 0, 0);
 				} else {
@@ -169,12 +237,12 @@ void move(int num_generation, int type, int x, int y) {
 					update_position(array[next].x, array[next].y, SQUIRREL, squirrel_breeding, num_generation, 0, 0);
 				}
 			}
-			else if(animal_world_indexer[array[next].x][array[next].y].breeding_flag < num_generation) {
+			else if(animal_world_indexer_read[array[next].x][array[next].y].breeding_flag < num_generation) {
 				if(array[next].on_tree) {
-					update_position(array[next].x, array[next].y, SQUIRREL_TREE, animal_world_indexer[x][y].breeding_period - 1, num_generation, 0, 0);
+					update_position(array[next].x, array[next].y, SQUIRREL_TREE, animal_world_indexer_read[x][y].breeding_period - 1, num_generation, 0, 0);
 				}
 				else {
-					update_position(array[next].x, array[next].y, SQUIRREL, animal_world_indexer[x][y].breeding_period - 1, num_generation, 0, 0);
+					update_position(array[next].x, array[next].y, SQUIRREL, animal_world_indexer_read[x][y].breeding_period - 1, num_generation, 0, 0);
 				}
 				if(type == SQUIRREL_TREE) {
 					update_position(x,y, TREE, 0, 0, 0, 0);
@@ -186,41 +254,41 @@ void move(int num_generation, int type, int x, int y) {
 		}
 	} else if (type == WOLF) {
 
-		if(animal_world_indexer[x][y].starvation_period == 0) {
+		if(animal_world_indexer_read[x][y].starvation_period == 0) {
 			update_position(x,y, EMPTY, 0, 0, 0, 0);
 			return;
 		}
 
 		sum = 0;
 		//Find squirls
-		if((y - 1 >= 0 ) && (animal_world_indexer[x][y-1].type == SQUIRREL)) {
+		if((y - 1 >= 0 ) && (animal_world_indexer_read[x][y-1].type == SQUIRREL)) {
 			array[sum].x=x;
 			array[sum].y=y-1;
 			sum++;
 		}
-		if((x + 1 < world_size) && (animal_world_indexer[x+1][y].type == SQUIRREL)) {
+		if((x + 1 < world_size) && (animal_world_indexer_read[x+1][y].type == SQUIRREL)) {
 			array[sum].x=x+1;
 			array[sum].y=y;
 			sum++;
 		}
-		if((y + 1 < world_size) && (animal_world_indexer[x][y+1].type == SQUIRREL)) {
+		if((y + 1 < world_size) && (animal_world_indexer_read[x][y+1].type == SQUIRREL)) {
 			array[sum].x=x;
 			array[sum].y=y+1;
 			sum++;
 		}
-		if((x - 1 >= 0) && (animal_world_indexer[x-1][y].type == SQUIRREL)) {
+		if((x - 1 >= 0) && (animal_world_indexer_read[x-1][y].type == SQUIRREL)) {
 			array[sum].x=x-1;
 			array[sum].y=y;
 			sum++;
 		}
 
 		if(sum == 1) {
-			if(animal_world_indexer[x][y].breeding_period == 0 ) {
+			if(animal_world_indexer_read[x][y].breeding_period == 0 ) {
 				update_position(x,y, WOLF, wolf_breeding, num_generation, wolf_starvation, num_generation);
 				update_position(array[0].x, array[0].y, WOLF, wolf_breeding, num_generation, wolf_starvation, num_generation);
 			}
-			else if(animal_world_indexer[array[0].x][array[0].y].breeding_flag < num_generation) {
-				update_position(array[0].x, array[0].y, WOLF, animal_world_indexer[x][y].breeding_period - 1, num_generation, animal_world_indexer[x][y].starvation_period - 1, num_generation);
+			else if(animal_world_indexer_read[array[0].x][array[0].y].breeding_flag < num_generation) {
+				update_position(array[0].x, array[0].y, WOLF, animal_world_indexer_read[x][y].breeding_period - 1, num_generation, animal_world_indexer_read[x][y].starvation_period - 1, num_generation);
 				update_position(x,y, EMPTY, 0, 0, 0, 0);
 			}
 
@@ -228,43 +296,43 @@ void move(int num_generation, int type, int x, int y) {
 			c = x * world_size + y;
 			next = c % sum;
 
-			if(animal_world_indexer[x][y].breeding_period == 0 ) {
+			if(animal_world_indexer_read[x][y].breeding_period == 0 ) {
 				update_position(x,y, WOLF, wolf_breeding, num_generation, wolf_starvation, num_generation);
 				update_position(array[next].x, array[next].y, WOLF, wolf_breeding, num_generation, wolf_starvation, num_generation);
 			}
-			else if(animal_world_indexer[array[next].x][array[next].y].breeding_flag < num_generation) {
-				update_position(array[next].x, array[next].y, WOLF, animal_world_indexer[x][y].breeding_period - 1, num_generation, animal_world_indexer[x][y].starvation_period - 1, num_generation);
+			else if(animal_world_indexer_read[array[next].x][array[next].y].breeding_flag < num_generation) {
+				update_position(array[next].x, array[next].y, WOLF, animal_world_indexer_read[x][y].breeding_period - 1, num_generation, animal_world_indexer_read[x][y].starvation_period - 1, num_generation);
 				update_position(x,y, EMPTY, 0, 0, 0, 0);
 			}
-			} else {
+		} else {
 			sum = 0;
-			if((y - 1 >= 0 ) && (animal_world_indexer[x][y-1].type == EMPTY)) {
+			if((y - 1 >= 0 ) && (animal_world_indexer_read[x][y-1].type == EMPTY)) {
 				array[sum].x=x;
 				array[sum].y=y-1;
 				sum++;
 			}
-			if((x + 1 < world_size) && (animal_world_indexer[x+1][y].type == EMPTY)) {
+			if((x + 1 < world_size) && (animal_world_indexer_read[x+1][y].type == EMPTY)) {
 				array[sum].x=x+1;
 				array[sum].y=y;
 				sum++;
 			}
-			if((y + 1 < world_size) && (animal_world_indexer[x][y+1].type == EMPTY)) {
+			if((y + 1 < world_size) && (animal_world_indexer_read[x][y+1].type == EMPTY)) {
 				array[sum].x=x;
 				array[sum].y=y+1;
 				sum++;
 			}
-			if((x - 1 >= 0) && (animal_world_indexer[x-1][y].type == EMPTY)) {
+			if((x - 1 >= 0) && (animal_world_indexer_read[x-1][y].type == EMPTY)) {
 				array[sum].x=x-1;
 				array[sum].y=y;
 				sum++;
 			}
 
 			if( sum == 0) {
-				if(animal_world_indexer[x][y].breeding_flag < num_generation) {
-					if(animal_world_indexer[x][y].breeding_period > 0) {
+				if(animal_world_indexer_read[x][y].breeding_flag < num_generation) {
+					if(animal_world_indexer_read[x][y].breeding_period > 0) {
 						animal_world_indexer[x][y].breeding_period--;
 					}
-					if(animal_world_indexer[x][y].starvation_period > 0) {
+					if(animal_world_indexer_read[x][y].starvation_period > 0) {
 						animal_world_indexer[x][y].starvation_period--;
 					}
 					animal_world_indexer[x][y].breeding_flag = num_generation;
@@ -274,12 +342,12 @@ void move(int num_generation, int type, int x, int y) {
 				c = x * world_size + y;
 				next = c % sum;
 
-				if(animal_world_indexer[x][y].breeding_period == 0 ) {
+				if(animal_world_indexer_read[x][y].breeding_period == 0 ) {
 					update_position(x,y, WOLF, wolf_breeding, num_generation, wolf_starvation, num_generation);
 					update_position(array[next].x, array[next].y, WOLF, wolf_breeding, num_generation, wolf_starvation, num_generation);
 				}
-				else if(animal_world_indexer[array[next].x][array[next].y].breeding_flag < num_generation) {
-					update_position(array[next].x, array[next].y, WOLF, animal_world_indexer[x][y].breeding_period - 1, num_generation, animal_world_indexer[x][y].starvation_period - 1, num_generation);
+				else if(animal_world_indexer_read[array[next].x][array[next].y].breeding_flag < num_generation) {
+					update_position(array[next].x, array[next].y, WOLF, animal_world_indexer_read[x][y].breeding_period - 1, num_generation, animal_world_indexer_read[x][y].starvation_period - 1, num_generation);
 					update_position(x,y, EMPTY, 0, 0, 0, 0);
 				}
 			}
@@ -354,7 +422,9 @@ int main(int argc, char *argv[]) {
 	genesis( fopen(argv[1], "r"), wolf_breeding, squirrel_breeding, wolf_starvation);
 
 	while( num_generation > 0 ) {
+		copy_matrix(world_size);
 		red_revelation(num_generation);
+		copy_matrix(world_size);
 		black_lamentation(num_generation);
 		num_generation--;
 	}
