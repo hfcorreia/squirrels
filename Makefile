@@ -1,7 +1,8 @@
 CC = gcc
 CFLAGS = -g -Wall -Wextra
+FILE = wolves-squirrels-serial.c
 all:
-	$(CC) -o wolves-squirrels-serial wolves-squirrels-serial_alternative.c $(CFLAGS)
+	$(CC) -o wolves-squirrels-serial $(FILE) $(CFLAGS)
 
 clean:
 	rm wolves-squirrels-serial
