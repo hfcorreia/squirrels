@@ -21,6 +21,7 @@ typedef struct world {
   int type;
   int breeding_period;
   int starvation_period;
+  int updated;
 } world;
 
 // GLOBAL variable!!!
@@ -33,6 +34,7 @@ int world_size;
 int wolf_breeding;
 int squirrel_breeding;
 int wolf_starvation;
+int num_generation;
 
 void print_final_matrix(int world_size) {
   int i, j;
@@ -159,10 +161,11 @@ void genesis(FILE *fp, int wolves_breeding_period, int squirrels_breeding_period
         break;
     }
     world_indexer[world_x][world_y].type = entity_number;
+    world_indexer[world_x][world_y].updated = num_generation;
   }
 }
 
-int is_free_position(int x, int y, int type){
+int is_free_position(int x, int y, int type) {
   if( type == WOLF) {
     return  world_indexer_r[x][y].type == EMPTY || world_indexer_r[x][y].type == SQUIRREL;
   } else {
@@ -172,19 +175,19 @@ int is_free_position(int x, int y, int type){
 }
 
 int can_move_up(int x, int y, int type) {
-  return x - 1 >= 0 && is_free_position(x-1, y, type);
+  return x - 1 >= 0 && is_free_position(x-1, y, type) && type == world_indexer_r[x-1][y].type;
 }
 
 int can_move_right(int x, int y, int type) {
-  return y + 1 < world_size && is_free_position(x, y+1, type);
+  return y + 1 < world_size && is_free_position(x, y+1, type) && type == world_indexer_r[x][y+1].type;
 }
 
 int can_move_down(int x, int y, int type) {
-  return x + 1 < world_size && is_free_position(x+1, y, type);
+  return x + 1 < world_size && is_free_position(x+1, y, type) && type == world_indexer_r[x+1][y].type;
 }
 
 int can_move_left(int x, int y, int type) {
-  return y - 1 >= 0 && is_free_position(x, y-1, type);
+  return y - 1 >= 0 && is_free_position(x, y-1, type) && type == world_indexer_r[x][y-1].type;
 }
 
 int* find_free_positions(int x, int y, int type) {
@@ -223,20 +226,22 @@ int find_next_positon(int x, int y, int type) {
   int * free_positions = find_free_positions( x, y, type);
   int * free_squirrels = find_squirrels(x, y);
   int * specific_positions;
-  int c = x * world_size + y, position, direction;
+  int c = x * world_size + y, position = -1, direction;
 
-  if( type == WOLF && count_free_positions(free_squirrels) > 0){
-    position = c % count_free_positions(free_squirrels);
+  int free_counter = count_free_positions(free_positions);
+  int squirrel_counter = count_free_positions(free_squirrels);
+
+  if( type == WOLF &&  squirrel_counter > 0) {
+    position = c % squirrel_counter;
     specific_positions = free_squirrels;
-  } else {
-    position = c % count_free_positions(free_positions);
+  } else if ( free_counter > 0 ) {
+    position = c % free_counter;
     specific_positions = free_positions;
   }
 
   //printf("Moving x: %d y: %d\n", x, y);
-  //printf("Free positions: %d %d %d %d\n", free_positions[0], free_positions[1], free_positions[2], free_positions[3]);
+  printf("Free positions: %d %d %d %d\n", free_positions[0], free_positions[1], free_positions[2], free_positions[3]);
   //printf("Sq positions: %d %d %d %d\n", free_squirrels[0], free_squirrels[1], free_squirrels[2], free_squirrels[3]);
-
   //printf("Position: %d\n", position);
 
   for ( direction = 0; direction < 4 ; direction++){
@@ -252,53 +257,122 @@ int find_next_positon(int x, int y, int type) {
   return -1;
 }
 
-void update_position(int x, int y, int type, int breeding, int starvation) {
-  world_indexer[x][y].type = type;
-  world_indexer[x][y].breeding_period = breeding;
-  world_indexer[x][y].starvation_period = starvation;
+int can_update(int x, int y) {
+    return num_generation >= world_indexer[x][y].updated ? TRUE : FALSE;
 }
 
-void move_squirrel(int from_x, int from_y, int to_x, int to_y, int breeding, int starvation) {
+void update_position(int x, int y, int type, int from_breeding, int from_starvation, int to_breeding, int to_starvation) {
+    world_indexer[x][y].type = type;
+
+    if( can_update(x ,y) ) {
+        world_indexer[x][y].breeding_period = to_breeding;
+        world_indexer[x][y].starvation_period = to_starvation;
+        world_indexer[x][y].updated = num_generation - 1;
+    } else {
+        world_indexer[x][y].breeding_period = from_breeding;
+        world_indexer[x][y].starvation_period = from_starvation;
+    }
+}
+
+
+void move_squirrel(int from_x, int from_y, int to_x, int to_y, int breeding) {
   int to_type = world_indexer_r[to_x][to_y].type;
 
+  int to_breeding = world_indexer_r[to_x][to_y].breeding_period;
+
   if( to_type == TREE) {
-    update_position( to_x, to_y, SQUIRREL_TREE, breeding, starvation);
+    update_position( to_x, to_y, SQUIRREL_TREE, breeding , 0, breeding - 1, 0);
   } else if( to_type ==  SQUIRREL ) {
-    update_position( to_x, to_y, SQUIRREL, breeding, starvation);
+    int resulting_breeding = to_breeding <= breeding ? to_breeding : breeding;
+    update_position( to_x, to_y, SQUIRREL, breeding, 0, resulting_breeding, 0);
   } else {
-    update_position( to_x, to_y, SQUIRREL, breeding, starvation);
+    update_position( to_x, to_y, SQUIRREL, breeding, 0, breeding - 1, 0);
   }
 
-  update_position(from_x, from_y, EMPTY, breeding, starvation);
+  update_position(from_x, from_y, EMPTY, 0, 0, 0, 0);
+}
+
+void move_wolves(int from_x, int from_y, int to_x, int to_y, int breeding, int starvation) {
+  int to_type = world_indexer_r[to_x][to_y].type;
+
+  int to_breeding = world_indexer_r[to_x][to_y].breeding_period;
+  int to_starvation = world_indexer_r[to_x][to_y].starvation_period;
+
+  if ( to_type == SQUIRREL ) {
+    update_position( to_x, to_y, WOLF, breeding, starvation, breeding - 1, wolf_starvation);
+  } else if ( to_type == WOLF ) {
+    int resulting_breeding = to_breeding <= breeding ? to_breeding : breeding;
+    int resulting_starvation = to_starvation <= starvation ? starvation : to_starvation;
+    update_position( to_x, to_y, WOLF, breeding, starvation, resulting_breeding, resulting_starvation);
+  } else {
+    update_position( to_x, to_y, WOLF, breeding, starvation, breeding - 1, starvation - 1);
+  }
+
+  update_position(from_x, from_y, EMPTY, 0, 0, 0, 0);
+}
+
+void move_squirrel_trees(int from_x, int from_y, int to_x, int to_y, int breeding) {
+  int to_type = world_indexer_r[to_x][to_y].type;
+
+  int to_breeding = world_indexer_r[to_x][to_y].breeding_period;
+
+  if( to_type == TREE) {
+    update_position( to_x, to_y, SQUIRREL_TREE, breeding, 0, breeding - 1, 0);
+  } else if( to_type ==  SQUIRREL ) {
+    int resulting_breeding = to_breeding <= breeding ? to_breeding : breeding;
+    update_position( to_x, to_y, SQUIRREL, breeding, 0, resulting_breeding, 0);
+  } else {
+    update_position( to_x, to_y, SQUIRREL, breeding, 0, breeding - 1, 0);
+  }
+
+  update_position(from_x, from_y, TREE, 0, 0, 0, 0);
 }
 
 void go_up(int x, int y, int type, int breeding, int starvation) {
-  if( type == SQUIRREL ) {
-    move_squirrel(x, y, x - 1, y, breeding, starvation);
+  if( type == SQUIRREL ) { 
+    move_squirrel(x, y, x - 1, y, breeding);
+  } else if ( type == WOLF ) {
+      move_wolves(x, y, x -1,  y, breeding, starvation);
+  } else if ( type == SQUIRREL_TREE ) {
+      move_squirrel_trees(x, y, x - 1, y, breeding);
   }
 }
 
 void go_right(int x, int y, int type, int breeding, int starvation) {
   if( type == SQUIRREL ) {
-    move_squirrel(x, y, x, y + 1, breeding, starvation);
+    move_squirrel(x, y, x, y + 1, breeding);
+  } else if ( type == WOLF ) {
+      move_wolves(x, y, x,  y + 1, breeding, starvation);
+  } else if ( type == SQUIRREL_TREE ) {
+      move_squirrel_trees(x, y, x , y + 1, breeding);
   }
 }
 
 void go_down(int x, int y, int type, int breeding, int starvation) {
   if( type == SQUIRREL ) {
-    move_squirrel(x, y, x + 1, y, breeding, starvation);
+    move_squirrel(x, y, x + 1, y, breeding);
+  } else if ( type == WOLF ) {
+      move_wolves(x, y, x + 1,  y, breeding, starvation);
+  } else if ( type == SQUIRREL_TREE ) {
+      move_squirrel_trees(x, y, x + 1, y, breeding);
   }
 }
 
 void go_left(int x, int y, int type, int breeding, int starvation) {
   if( type == SQUIRREL ) {
-    move_squirrel(x, y, x, y - 1, breeding, starvation);
+    move_squirrel(x, y, x, y - 1, breeding);
+  } else if ( type == WOLF ) {
+      move_wolves(x, y, x ,  y - 1, breeding, starvation);
+  } else if ( type == SQUIRREL_TREE ) {
+      move_squirrel_trees(x, y, x , y - 1, breeding);
   }
 }
 
 void move(int x, int y, int type) {
   int next_position = find_next_positon(x, y, type);
-  int breeding = 0, starvation = 0;
+  int breeding = world_indexer_r[x][y].breeding_period;
+  int starvation = world_indexer_r[x][y].starvation_period;
+
 
   switch(next_position) {
     case UP:
@@ -318,18 +392,79 @@ void move(int x, int y, int type) {
   }
 }
 
-void exodus(int x, int y){
-  int type =  world_indexer_r[x][y].type;
+void baby(int x, int y, int type){
+    if( type == WOLF ) {
+        world_indexer[x][y].type = type;
+        world_indexer[x][y].breeding_period = wolf_breeding;
+        world_indexer[x][y].starvation_period = wolf_starvation;
+        world_indexer[x][y].updated = num_generation + 1;
+    } else {
+        world_indexer[x][y].type = type;
+        world_indexer[x][y].breeding_period = squirrel_breeding;
+        world_indexer[x][y].starvation_period = 0;
+        world_indexer[x][y].updated = num_generation + 1;
+    }
+}
 
-  if( type == SQUIRREL || type == WOLF || type == SQUIRREL_TREE ) {
-    move(x, y, type);
+void breed(int x, int y, int type) {
+ int next_position = find_next_positon(x, y, type);
+    int breeding = world_indexer_r[x][y].breeding_period;
+    int starvation = world_indexer_r[x][y].starvation_period;
+
+  switch(next_position) {
+    case UP:
+      go_up(x, y, type, breeding, starvation);
+      baby(x, y, type);
+      break;
+    case RIGHT:
+      go_right( x, y, type, breeding, starvation);
+      baby(x, y, type);
+      break;
+    case DOWN:
+      go_down( x, y, type, breeding, starvation);
+      baby(x, y, type);
+      break;
+    case LEFT:
+      go_left( x, y, type, breeding, starvation);
+      baby(x, y, type);
+      break;
+    default:
+      return;
   }
+
+
+  printf("BREEDING\n");
+  print_matrix(world_size); fflush(stdout);
+  printf("\n");
+}
+
+void exodus(int x, int y){
+    int type =  world_indexer_r[x][y].type;
+    int breeding = world_indexer_r[x][y].breeding_period;
+    int starvation = world_indexer_r[x][y].starvation_period;
+
+    if( type == SQUIRREL || type == WOLF || type == SQUIRREL_TREE ) {
+
+        if( breeding == 0 ) {
+            breed( x, y, type);
+        }
+
+        if( starvation == 0 && type == WOLF ) {
+            world_indexer[x][y].type = EMPTY;
+            world_indexer[x][y].breeding_period = 0;
+            world_indexer[x][y].starvation_period = 0;
+            world_indexer[x][y].updated = num_generation + 1;
+            return;
+        }
+
+        move(x, y, type);
+    }
 }
 
 void sub_generation(int black_generation){
   int i, j;
 
-  for(i = 0; i < world_size; i++){
+  for(i = 0; i < world_size; i++) {
     if( black_generation ) {
       j = ( i % 2 == 0) ? 1 : 0;
     } else {
@@ -354,7 +489,7 @@ int main(int argc, char *argv[]) {
   wolf_breeding = atoi(argv[2]);
   squirrel_breeding = atoi(argv[3]);
   wolf_starvation = atoi(argv[4]);
-  int num_generation = atoi(argv[5]);
+  num_generation = atoi(argv[5]);
 
   // process input
   genesis( fopen(argv[1], "r"), wolf_breeding, squirrel_breeding, wolf_starvation);
@@ -364,27 +499,31 @@ int main(int argc, char *argv[]) {
   printf("Original:\n");
   print_matrix(world_size); fflush(stdout);
   printf("\n"); fflush(stdout);
+
   // process generations
   while( num_generation > 0 ) {
-    printf("======== GEN\n"); fflush(stdout);
+    printf("======== GEN ==========\n"); fflush(stdout);
+
     // 1st subgeneration
     copy_matrix(world_size);
     sub_generation(FALSE);
-    printf("\nRed\n");
+
+    printf("\nRed\n"); fflush(stdout);
     print_matrix(world_size); fflush(stdout);
     printf("\n"); fflush(stdout);
 
     // 2nd subgeneration
     copy_matrix(world_size);
     sub_generation(TRUE);
-    printf("\nBlack\n");
+
+    printf("\nBlack\n"); fflush(stdout);
     print_matrix(world_size); fflush(stdout);
     printf("\n"); fflush(stdout);
 
     num_generation--;
   }
 
-  printf("Final:\n");
+  printf("Final:\n"); fflush(stdout);
   print_final_matrix(world_size);
 
   return 0;
