@@ -519,6 +519,5 @@ int main(int argc, char *argv[]) {
 
     printf("Final:\n"); fflush(stdout);
     print_final_matrix(world_size); fflush(stdout);
-
     return 0;
 }
