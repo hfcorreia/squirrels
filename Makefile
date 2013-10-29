@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -g -Wall -Wextra
-FILE = wolves.c
+FILE = wolves-squirrels-serial.c
 all:
 	$(CC) -o wolves-squirrels-serial $(FILE) $(CFLAGS)
 
