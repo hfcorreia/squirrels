@@ -175,19 +175,19 @@ int is_free_position(int x, int y, int type) {
 }
 
 int can_move_up(int x, int y, int type) {
-  return x - 1 >= 0 && is_free_position(x-1, y, type) && type == world_indexer_r[x-1][y].type;
+  return x - 1 >= 0 && is_free_position(x-1, y, type) && type != world_indexer_r[x-1][y].type;
 }
 
 int can_move_right(int x, int y, int type) {
-  return y + 1 < world_size && is_free_position(x, y+1, type) && type == world_indexer_r[x][y+1].type;
+  return y + 1 < world_size && is_free_position(x, y+1, type) && type != world_indexer_r[x][y+1].type;
 }
 
 int can_move_down(int x, int y, int type) {
-  return x + 1 < world_size && is_free_position(x+1, y, type) && type == world_indexer_r[x+1][y].type;
+  return x + 1 < world_size && is_free_position(x+1, y, type) && type != world_indexer_r[x+1][y].type;
 }
 
 int can_move_left(int x, int y, int type) {
-  return y - 1 >= 0 && is_free_position(x, y-1, type) && type == world_indexer_r[x][y-1].type;
+  return y - 1 >= 0 && is_free_position(x, y-1, type) && type != world_indexer_r[x][y-1].type;
 }
 
 int* find_free_positions(int x, int y, int type) {
@@ -237,15 +237,17 @@ int find_next_positon(int x, int y, int type) {
   } else if ( free_counter > 0 ) {
     position = c % free_counter;
     specific_positions = free_positions;
+  } else {
+      return -1;
   }
 
   //printf("Moving x: %d y: %d\n", x, y);
-  printf("Free positions: %d %d %d %d\n", free_positions[0], free_positions[1], free_positions[2], free_positions[3]);
+  //printf("Free positions: %d %d %d %d\n", free_positions[0], free_positions[1], free_positions[2], free_positions[3]);
   //printf("Sq positions: %d %d %d %d\n", free_squirrels[0], free_squirrels[1], free_squirrels[2], free_squirrels[3]);
   //printf("Position: %d\n", position);
 
   for ( direction = 0; direction < 4 ; direction++){
-    if( specific_positions[direction] ) {
+    if( specific_positions[direction] ) { 
       position--;
     }
     if ( position == -1 ) {
@@ -431,11 +433,6 @@ void breed(int x, int y, int type) {
     default:
       return;
   }
-
-
-  printf("BREEDING\n");
-  print_matrix(world_size); fflush(stdout);
-  printf("\n");
 }
 
 void exodus(int x, int y){
