@@ -263,8 +263,9 @@ int can_update(int x, int y) {
     return !world_indexer[x][y].updated;
 }
 
-void update_position(int from_x, int from_y, int to_x, int to_y, int type, int from_breeding, int from_starvation, int to_breeding, int to_starvation) {
-    world_indexer[to_x][to_y].type = type;
+void update_position(int from_x, int from_y, int from_type, 
+        int to_x, int to_y, int to_type, int from_breeding, int from_starvation, int to_breeding, int to_starvation) {
+    world_indexer[to_x][to_y].type = to_type;
 
     printf("Updating: %d %d ", to_x, to_y);
     if( can_update(from_x , from_y) ) {
@@ -276,8 +277,7 @@ void update_position(int from_x, int from_y, int to_x, int to_y, int type, int f
         world_indexer[to_x][to_y].starvation_period = from_starvation;
     }
 
-    // clear the last position.
-    world_indexer[from_x][from_y].type = EMPTY;
+    world_indexer[from_x][from_y].type = from_type;
     world_indexer[from_x][from_y].breeding_period = 0;
     world_indexer[from_x][from_y].starvation_period = 0;
     world_indexer[from_x][from_y].updated = 0;
@@ -290,12 +290,12 @@ void move_squirrel(int from_x, int from_y, int to_x, int to_y, int breeding) {
     int to_breeding = world_indexer_r[to_x][to_y].breeding_period;
 
     if( to_type == TREE) {
-        update_position(from_x, from_y, to_x, to_y, SQUIRREL_TREE, breeding , 0, breeding - 1, 0);
+        update_position(from_x, from_y, EMPTY, to_x, to_y, SQUIRREL_TREE, breeding , 0, breeding - 1, 0);
     } else if( to_type ==  SQUIRREL ) {
         int resulting_breeding = to_breeding <= breeding ? to_breeding : breeding;
-        update_position(from_x, from_y, to_x, to_y, SQUIRREL, breeding, 0, resulting_breeding, 0);
+        update_position(from_x, from_y, EMPTY, to_x, to_y, SQUIRREL, breeding, 0, resulting_breeding, 0);
     } else {
-        update_position(from_x, from_y, to_x, to_y, SQUIRREL, breeding, 0, breeding - 1, 0);
+        update_position(from_x, from_y, EMPTY, to_x, to_y, SQUIRREL, breeding, 0, breeding - 1, 0);
     }
 }
 
@@ -306,13 +306,13 @@ void move_wolves(int from_x, int from_y, int to_x, int to_y, int breeding, int s
     int to_starvation = world_indexer_r[to_x][to_y].starvation_period;
 
     if ( to_type == SQUIRREL ) {
-        update_position( from_x, from_y, to_x, to_y, WOLF, breeding, starvation, breeding - 1, wolf_starvation);
+        update_position( from_x, from_y, EMPTY, to_x, to_y, WOLF, breeding, starvation, breeding - 1, wolf_starvation);
     } else if ( to_type == WOLF ) {
         int resulting_breeding = to_breeding <= breeding ? to_breeding : breeding;
         int resulting_starvation = to_starvation <= starvation ? starvation : to_starvation;
-        update_position( from_x, from_y, to_x, to_y, WOLF, breeding, starvation, resulting_breeding, resulting_starvation);
+        update_position( from_x, from_y, EMPTY, to_x, to_y, WOLF, breeding, starvation, resulting_breeding, resulting_starvation);
     } else {
-        update_position( from_x, from_y, to_x, to_y, WOLF, breeding, starvation, breeding - 1, starvation - 1);
+        update_position( from_x, from_y, EMPTY, to_x, to_y, WOLF, breeding, starvation, breeding - 1, starvation - 1);
     }
 }
 
@@ -322,12 +322,12 @@ void move_squirrel_trees(int from_x, int from_y, int to_x, int to_y, int breedin
     int to_breeding = world_indexer_r[to_x][to_y].breeding_period;
 
     if( to_type == TREE) {
-        update_position( from_x, from_y, to_x, to_y, SQUIRREL_TREE, breeding, 0, breeding - 1, 0);
+        update_position( from_x, from_y, TREE, to_x, to_y, SQUIRREL_TREE, breeding, 0, breeding - 1, 0);
     } else if( to_type ==  SQUIRREL ) {
         int resulting_breeding = to_breeding <= breeding ? to_breeding : breeding;
-        update_position( from_x, from_y, to_x, to_y, SQUIRREL, breeding, 0, resulting_breeding, 0);
+        update_position( from_x, from_y, TREE, to_x, to_y, SQUIRREL, breeding, 0, resulting_breeding, 0);
     } else {
-        update_position( from_x, from_y, to_x, to_y, SQUIRREL, breeding, 0, breeding - 1, 0);
+        update_position( from_x, from_y, TREE, to_x, to_y, SQUIRREL, breeding, 0, breeding - 1, 0);
     }
 }
 
