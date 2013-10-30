@@ -259,7 +259,6 @@ int find_next_positon(int x, int y, int type) {
 }
 
 int can_update(int x, int y) {
-    //printf("Can update: %d\n", world_indexer[x][y].updated);
     return !world_indexer[x][y].updated;
 }
 
@@ -267,7 +266,6 @@ void update_position(int from_x, int from_y, int from_type,
     int to_x, int to_y, int to_type, int from_breeding, int from_starvation, int to_breeding, int to_starvation) {
     world_indexer[to_x][to_y].type = to_type;
 
-    //printf("Updating: %d %d ", to_x, to_y);
     if( can_update(from_x , from_y) ) {
         world_indexer[to_x][to_y].breeding_period = to_breeding;
         world_indexer[to_x][to_y].starvation_period = to_starvation;
@@ -376,7 +374,6 @@ void move(int x, int y, int type) {
     int breeding = world_indexer_r[x][y].breeding_period;
     int starvation = world_indexer_r[x][y].starvation_period;
 
-        //printf("next_pos %d starv %d\n", next_position, world_indexer[x][y].starvation_period);
     switch(next_position) {
         case UP:
         go_up(x, y, type, breeding, starvation);
@@ -402,7 +399,6 @@ void move(int x, int y, int type) {
 }
 
 void baby(int x, int y, int type){
-    //printf("BABY type %d\n", type);
     if( type == WOLF ) {
         world_indexer[x][y].type = type;
         world_indexer[x][y].breeding_period = wolf_breeding;
@@ -421,7 +417,6 @@ void breed(int x, int y, int type) {
     int breeding = world_indexer_r[x][y].breeding_period;
     int starvation = world_indexer_r[x][y].starvation_period;
 
-    //printf("breed x %d y %d next_pos %d\n", x, y, next_position);
     switch(next_position) {
         case UP:
         go_up(x, y, type, breeding, starvation);
@@ -457,16 +452,13 @@ void exodus(int x, int y){
 
     if( type == SQUIRREL || type == WOLF || type == SQUIRREL_TREE ) {
 
-        //printf("x %d y %d breed %d starv: %d can_update? %d\n", x, y, breeding, starvation, can_update(x,y));
         if( starvation == 0 && type == WOLF  && can_update(x,y) ) {
-            //printf("I died in gen: %d\n", current_generation);
             world_indexer[x][y].type = EMPTY;
             world_indexer[x][y].breeding_period = 0;
             world_indexer[x][y].starvation_period = 0;
             world_indexer[x][y].updated = 0;
             return;
         }
-        //printf("breeding %d can_update? %d\n", breeding, can_update(x,y));
         if( breeding == 0  && can_update(x, y) ) {
             breed( x, y, type);
         }
