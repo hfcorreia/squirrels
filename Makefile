@@ -11,3 +11,4 @@ parallel:
 
 clean:
 	rm wolves-squirrels-serial
+	rm wolves-squirrels-omp
