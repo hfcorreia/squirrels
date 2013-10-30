@@ -376,6 +376,7 @@ void move(int x, int y, int type) {
     int breeding = world_indexer_r[x][y].breeding_period;
     int starvation = world_indexer_r[x][y].starvation_period;
 
+        //printf("next_pos %d starv %d\n", next_position, world_indexer[x][y].starvation_period);
     switch(next_position) {
         case UP:
         go_up(x, y, type, breeding, starvation);
@@ -390,6 +391,12 @@ void move(int x, int y, int type) {
         go_left( x, y, type, breeding, starvation);
         break;
         default:
+        if(world_indexer[x][y].starvation_period > 0) {
+            world_indexer[x][y].starvation_period--;
+        }
+        if(world_indexer[x][y].breeding_period > 0) {
+            world_indexer[x][y].breeding_period--;
+        }
         return;
     }
 }
@@ -414,7 +421,7 @@ void breed(int x, int y, int type) {
     int breeding = world_indexer_r[x][y].breeding_period;
     int starvation = world_indexer_r[x][y].starvation_period;
 
-   //printf("breed x %d y %d next_pos %d\n", x, y, next_position);
+    //printf("breed x %d y %d next_pos %d\n", x, y, next_position);
     switch(next_position) {
         case UP:
         go_up(x, y, type, breeding, starvation);
@@ -433,6 +440,12 @@ void breed(int x, int y, int type) {
         baby(x, y, type);
         break;
         default:
+        if(world_indexer[x][y].starvation_period > 0) {
+            world_indexer[x][y].starvation_period--;
+        }
+        if(world_indexer[x][y].breeding_period > 0) {
+            world_indexer[x][y].breeding_period--;
+        }
         return;
     }
 }
@@ -444,7 +457,7 @@ void exodus(int x, int y){
 
     if( type == SQUIRREL || type == WOLF || type == SQUIRREL_TREE ) {
 
-        //printf("starv: %d\n", starvation);
+        //printf("x %d y %d breed %d starv: %d can_update? %d\n", x, y, breeding, starvation, can_update(x,y));
         if( starvation == 0 && type == WOLF  && can_update(x,y) ) {
             //printf("I died in gen: %d\n", current_generation);
             world_indexer[x][y].type = EMPTY;
@@ -498,23 +511,15 @@ int main(int argc, char *argv[]) {
     // process input
     genesis( fopen(argv[1], "r"), wolf_breeding, squirrel_breeding, wolf_starvation);
 
-    printf("Original:\n"); print_matrix(world_size); printf("\n"); fflush(stdout);
-
     // process generations
     for( i = 0; i < num_generation; i++) {
-        printf("======== GEN ==========\n"); fflush(stdout);
-
         // 1st subgeneration
         copy_matrix(world_size, TRUE);
         sub_generation(FALSE);
 
-        printf("\nRed\n"); print_matrix(world_size); printf("\n"); fflush(stdout);
-
         // 2nd subgeneration
         copy_matrix(world_size, FALSE);
         sub_generation(TRUE);
-
-        printf("\nBlack\n"); print_matrix(world_size); printf("\n"); fflush(stdout);
     }
 
     printf("Final:\n"); fflush(stdout);

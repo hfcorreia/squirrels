@@ -95,6 +95,7 @@ void print_matrix(int world_size) {
 
 void copy_matrix(int world_size, int clean_update) {
     int i, j;
+
     world_array_r = (world*)malloc(sizeof(world)*world_size*world_size);
     world_indexer_r = (world**)malloc(sizeof(world*)*world_size);
 
@@ -265,9 +266,10 @@ int can_update(int x, int y) {
 
 void update_position(int from_x, int from_y, int from_type, 
     int to_x, int to_y, int to_type, int from_breeding, int from_starvation, int to_breeding, int to_starvation) {
-    world_indexer[to_x][to_y].type = to_type;
 
-    //printf("Updating: %d %d ", to_x, to_y);
+    //printf("Updating: %d %d with type %d and previous type %d\n", to_x, to_y, to_type, world_indexer[to_x][to_y].type);
+    // TODO conflict management
+    world_indexer[to_x][to_y].type = to_type;
     if( can_update(from_x , from_y) ) {
         world_indexer[to_x][to_y].breeding_period = to_breeding;
         world_indexer[to_x][to_y].starvation_period = to_starvation;
@@ -486,7 +488,8 @@ int init(int i, int black_generation) {
 void sub_generation(int black_generation){
     int i, j;
 
-    #pragma omp parallel for private(j)
+    // define workload x for each thread or just leave schedule(dynamic)
+    #pragma omp parallel for private(j) if(world_size > 50) //schedule(dynamic, x)
     for(i = 0; i < world_size; i++) { 
         for(j = init(i, black_generation); j < world_size; j = j + 2) {
             exodus(i, j);
