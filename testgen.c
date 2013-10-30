@@ -1,42 +1,39 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
+#include <stdlib.h>
 
-int main(int argc, char* argv[]) {
+int main(int argc, char * argv[]){
 
-	int entities = atoi(argv[1]);
-	int world_size = atoi(argv[2]);
-	int i = 0;
-	printf("%d\n", world_size);
+    int world_size = atoi( argv[1] );
+    int array[] = { 0, 1, 2, 3, 4, 0, 0, 0, 0};
 
-	srand(time(NULL));
+    printf("%d\n", world_size);
 
-	while(i < entities) {
-		int animal = rand()%6;
-		if(animal != 0) {
-			printf("%d %d ", rand()%world_size, rand()%world_size);
+    int i, j;
+    srand((unsigned) time(NULL));
 
-			switch(animal) {
-				case 1:
-				printf("%c\n", 's');
-				break;
-				case 2:
-				printf("%c\n", 'w');
-				break;
-				case 3:
-				printf("%c\n", 't');
-				break;
-				case 4:
-				printf("%c\n", 'i');
-				break;
-				case 5:
-				printf("%c\n", '$');
-				break;
-				default:
-				break;
-			}
-			i++;
-		}
-	}
+    for( i = 0 ; i < world_size; i++){
+        for( j = 0; j < world_size; j++) {
+            char c;
+            int pos = array[ rand() % 9];
 
-	return 0;
+            if( pos == 0 ){
+                continue;
+            }
+
+            if ( pos == 1 ) {
+                c = 'w';
+            } else if (pos == 2) {
+                c = 's';
+            } else if ( pos == 3) {
+                c = 't';
+            } else if ( pos == 4) {
+                c = 'i';
+            }
+
+            printf("%d %d %c\n", i, j, c);
+        }
+    }
 }
+
+

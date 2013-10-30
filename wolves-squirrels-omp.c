@@ -44,20 +44,20 @@ void print_final_matrix(int world_size) {
         for(j = 0; j < world_size; j++) {
             switch(world_indexer[i][j].type) {
                 case SQUIRREL:
-                printf("%d %d %c\n", i, j, 's');
-                break;
+                    printf("%d %d %c\n", i, j, 's');
+                    break;
                 case WOLF:
-                printf("%d %d %c\n", i, j, 'w');
-                break;
+                    printf("%d %d %c\n", i, j, 'w');
+                    break;
                 case TREE:
-                printf("%d %d %c\n", i, j, 't');
-                break;
+                    printf("%d %d %c\n", i, j, 't');
+                    break;
                 case ICE:
-                printf("%d %d %c\n", i, j, 'i');
-                break;
+                    printf("%d %d %c\n", i, j, 'i');
+                    break;
                 case SQUIRREL_TREE:
-                printf("%d %d %c\n", i, j, '$');
-                break;
+                    printf("%d %d %c\n", i, j, '$');
+                    break;
             }
         }
     }
@@ -70,23 +70,23 @@ void print_matrix(int world_size) {
             printf("%c", '|');
             switch(world_indexer[i][j].type) {
                 case SQUIRREL:
-                printf("%c", 's');
-                break;
+                    printf("%c", 's');
+                    break;
                 case WOLF:
-                printf("%c", 'w');
-                break;
+                    printf("%c", 'w');
+                    break;
                 case TREE:
-                printf("%c", 't');
-                break;
+                    printf("%c", 't');
+                    break;
                 case ICE:
-                printf("%c", 'i');
-                break;
+                    printf("%c", 'i');
+                    break;
                 case SQUIRREL_TREE:
-                printf("%c", '$');
-                break;
+                    printf("%c", '$');
+                    break;
                 default:
-                printf("%c", ' ');
-                break;
+                    printf("%c", ' ');
+                    break;
             }
         }
         printf("|\n");
@@ -99,7 +99,7 @@ void copy_matrix(int world_size, int clean_update) {
     world_array_r = (world*)malloc(sizeof(world)*world_size*world_size);
     world_indexer_r = (world**)malloc(sizeof(world*)*world_size);
 
-    #pragma omp parallel for private(j)
+#pragma omp parallel for private(j)
     for (i = 0; i < world_size; ++i) {
         world_indexer_r[i] = &world_array_r[i*world_size];
         for(j = 0; j < world_size; ++j) {
@@ -123,7 +123,7 @@ void initialization(int world_size) {
     world_array = (world*)malloc(sizeof(world)*world_size*world_size);
     world_indexer = (world**)malloc(sizeof(world*)*world_size);
 
-    #pragma omp parallel for 
+#pragma omp parallel for 
     for (i = 0; i < world_size; ++i) {
         world_indexer[i] = &world_array[i*world_size];
     }
@@ -141,30 +141,30 @@ void genesis(FILE *fp, int wolves_breeding_period, int squirrels_breeding_period
     while (fscanf(fp, "%d %d %c",&world_x, &world_y, &entity) != EOF) { // expect 1 successful conversion
         switch(entity) {
             case 's':
-            entity_number = SQUIRREL;
-            world_indexer[world_x][world_y].breeding_period = squirrels_breeding_period;
-            world_indexer[world_x][world_y].starvation_period = 0;
-            break;
+                entity_number = SQUIRREL;
+                world_indexer[world_x][world_y].breeding_period = squirrels_breeding_period;
+                world_indexer[world_x][world_y].starvation_period = 0;
+                break;
             case 'w':
-            entity_number = WOLF;
-            world_indexer[world_x][world_y].breeding_period = wolves_breeding_period;
-            world_indexer[world_x][world_y].starvation_period = wolves_starvation_period;
-            break;
+                entity_number = WOLF;
+                world_indexer[world_x][world_y].breeding_period = wolves_breeding_period;
+                world_indexer[world_x][world_y].starvation_period = wolves_starvation_period;
+                break;
             case 't':
-            entity_number = TREE;
-            world_indexer[world_x][world_y].breeding_period = 0;
-            world_indexer[world_x][world_y].starvation_period = 0;
-            break;
+                entity_number = TREE;
+                world_indexer[world_x][world_y].breeding_period = 0;
+                world_indexer[world_x][world_y].starvation_period = 0;
+                break;
             case 'i':
-            entity_number = ICE;
-            world_indexer[world_x][world_y].breeding_period = 0;
-            world_indexer[world_x][world_y].starvation_period = 0;
-            break;
+                entity_number = ICE;
+                world_indexer[world_x][world_y].breeding_period = 0;
+                world_indexer[world_x][world_y].starvation_period = 0;
+                break;
             default:
-            entity_number = EMPTY;
-            world_indexer[world_x][world_y].breeding_period = 0;
-            world_indexer[world_x][world_y].starvation_period = 0;
-            break;
+                entity_number = EMPTY;
+                world_indexer[world_x][world_y].breeding_period = 0;
+                world_indexer[world_x][world_y].starvation_period = 0;
+                break;
         }
         world_indexer[world_x][world_y].type = entity_number;
         world_indexer[world_x][world_y].updated = 0;
@@ -260,14 +260,12 @@ int find_next_positon(int x, int y, int type) {
 }
 
 int can_update(int x, int y) {
-    //printf("Can update: %d\n", world_indexer[x][y].updated);
     return !world_indexer[x][y].updated;
 }
 
 void update_position(int from_x, int from_y, int from_type, 
-    int to_x, int to_y, int to_type, int from_breeding, int from_starvation, int to_breeding, int to_starvation) {
+        int to_x, int to_y, int to_type, int from_breeding, int from_starvation, int to_breeding, int to_starvation) {
 
-    //printf("Updating: %d %d with type %d and previous type %d\n", to_x, to_y, to_type, world_indexer[to_x][to_y].type);
     // TODO conflict management
     world_indexer[to_x][to_y].type = to_type;
     if( can_update(from_x , from_y) ) {
@@ -380,30 +378,29 @@ void move(int x, int y, int type) {
 
     switch(next_position) {
         case UP:
-        go_up(x, y, type, breeding, starvation);
-        break;
+            go_up(x, y, type, breeding, starvation);
+            break;
         case RIGHT:
-        go_right( x, y, type, breeding, starvation);
-        break;
+            go_right( x, y, type, breeding, starvation);
+            break;
         case DOWN:
-        go_down( x, y, type, breeding, starvation);
-        break;
+            go_down( x, y, type, breeding, starvation);
+            break;
         case LEFT:
-        go_left( x, y, type, breeding, starvation);
-        break;
+            go_left( x, y, type, breeding, starvation);
+            break;
         default:
-        if(world_indexer[x][y].starvation_period > 0) {
-            world_indexer[x][y].starvation_period--;
-        }
-        if(world_indexer[x][y].breeding_period > 0) {
-            world_indexer[x][y].breeding_period--;
-        }
-        return;
+            if(world_indexer[x][y].starvation_period > 0) {
+                world_indexer[x][y].starvation_period--;
+            }
+            if(world_indexer[x][y].breeding_period > 0) {
+                world_indexer[x][y].breeding_period--;
+            }
+            return;
     }
 }
 
 void baby(int x, int y, int type){
-    //printf("BABY type %d\n", type);
     if( type == WOLF ) {
         world_indexer[x][y].type = type;
         world_indexer[x][y].breeding_period = wolf_breeding;
@@ -422,32 +419,31 @@ void breed(int x, int y, int type) {
     int breeding = world_indexer_r[x][y].breeding_period;
     int starvation = world_indexer_r[x][y].starvation_period;
 
-   //printf("breed x %d y %d next_pos %d\n", x, y, next_position);
     switch(next_position) {
         case UP:
-        go_up(x, y, type, breeding, starvation);
-        baby(x, y, type);
-        break;
+            go_up(x, y, type, breeding, starvation);
+            baby(x, y, type);
+            break;
         case RIGHT:
-        go_right( x, y, type, breeding, starvation);
-        baby(x, y, type);
-        break;
+            go_right( x, y, type, breeding, starvation);
+            baby(x, y, type);
+            break;
         case DOWN:
-        go_down( x, y, type, breeding, starvation);
-        baby(x, y, type);
-        break;
+            go_down( x, y, type, breeding, starvation);
+            baby(x, y, type);
+            break;
         case LEFT:
-        go_left( x, y, type, breeding, starvation);
-        baby(x, y, type);
-        break;
+            go_left( x, y, type, breeding, starvation);
+            baby(x, y, type);
+            break;
         default:
-        if(world_indexer[x][y].starvation_period > 0) {
-            world_indexer[x][y].starvation_period--;
-        }
-        if(world_indexer[x][y].breeding_period > 0) {
-            world_indexer[x][y].breeding_period--;
-        }
-        return;
+            if(world_indexer[x][y].starvation_period > 0) {
+                world_indexer[x][y].starvation_period--;
+            }
+            if(world_indexer[x][y].breeding_period > 0) {
+                world_indexer[x][y].breeding_period--;
+            }
+            return;
     }
 }
 
@@ -458,16 +454,14 @@ void exodus(int x, int y){
 
     if( type == SQUIRREL || type == WOLF || type == SQUIRREL_TREE ) {
 
-        //printf("starv: %d\n", starvation);
         if( starvation == 0 && type == WOLF  && can_update(x,y) ) {
-            //printf("I died in gen: %d\n", current_generation);
             world_indexer[x][y].type = EMPTY;
             world_indexer[x][y].breeding_period = 0;
             world_indexer[x][y].starvation_period = 0;
             world_indexer[x][y].updated = 0;
             return;
         }
-        //printf("breeding %d can_update? %d\n", breeding, can_update(x,y));
+
         if( breeding == 0  && can_update(x, y) ) {
             breed( x, y, type);
         }
@@ -479,9 +473,9 @@ void exodus(int x, int y){
 
 int init(int i, int black_generation) {
     if( black_generation ) {
-            return ( i % 2 == 0) ? 1 : 0;
-        } else {
-            return ( i % 2 == 0) ? 0 : 1;
+        return ( i % 2 == 0) ? 1 : 0;
+    } else {
+        return ( i % 2 == 0) ? 0 : 1;
     }
 }
 
@@ -489,7 +483,7 @@ void sub_generation(int black_generation){
     int i, j;
 
     // define workload x for each thread or just leave schedule(dynamic)
-    #pragma omp parallel for private(j) if(world_size > 50) //schedule(dynamic, x)
+#pragma omp parallel for private(j) if(world_size > 50) //schedule(dynamic, x)
     for(i = 0; i < world_size; i++) { 
         for(j = init(i, black_generation); j < world_size; j = j + 2) {
             exodus(i, j);
