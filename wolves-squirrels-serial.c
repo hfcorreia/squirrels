@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #define UP 0
 #define RIGHT 1
@@ -29,6 +30,8 @@ world* world_array;
 world** world_indexer;
 world* world_array_r;
 world** world_indexer_r;
+world* old_array;
+world** old_indexer;
 
 int world_size;
 int wolf_breeding;
@@ -92,39 +95,45 @@ void print_matrix(int world_size) {
     }
 }
 
-void copy_matrix(int world_size, int clean_update) {
-    int i, j;
-    world_array_r = (world*)malloc(sizeof(world)*world_size*world_size);
-    world_indexer_r = (world**)malloc(sizeof(world*)*world_size);
+world* new_array() {
+    return (world*)malloc(sizeof(world)*world_size*world_size);   
+}
+
+world** new_indexer() {
+    return (world**)malloc(sizeof(world*)*world_size);
+}
+
+void new_matrix() {
+    int i;
+    world* aux_array = new_array();
+    world** aux_indexer = new_indexer();
 
     for (i = 0; i < world_size; ++i) {
-        world_indexer_r[i] = &world_array_r[i*world_size];
+        aux_indexer[i] = &aux_array[i*world_size];
     }
 
-    for (i = 0; i < world_size; ++i) {
-        for(j = 0; j < world_size; ++j) {
-            world_indexer_r[i][j].type = world_indexer[i][j].type;
-            world_indexer_r[i][j].breeding_period = world_indexer[i][j].breeding_period;
-            world_indexer_r[i][j].starvation_period = world_indexer[i][j].starvation_period;
-            if( clean_update ) { // when 1 clean the Matrix
-                world_indexer_r[i][j].updated = 0;
-            } else {
-                world_indexer_r[i][j].updated = world_indexer[i][j].updated;
-            }
-        }
-    }
+    old_indexer = world_indexer_r;
+    old_array = world_array_r;
 
+    world_indexer_r = world_indexer;
+    world_array_r = world_array;
+
+    world_indexer = aux_indexer;
+    world_array = aux_array;
 }
 
 /** Allocates space for the world. */
 void initialization(int world_size) {
     int i;
 
-    world_array = (world*)malloc(sizeof(world)*world_size*world_size);
-    world_indexer = (world**)malloc(sizeof(world*)*world_size);
+    world_array = new_array();
+    world_indexer = new_indexer();
+    world_array_r = new_array();
+    world_indexer_r = new_indexer();
 
     for (i = 0; i < world_size; ++i) {
         world_indexer[i] = &world_array[i*world_size];
+        world_indexer_r[i] = &world_array_r[i*world_size];
     }
 }
 
@@ -259,20 +268,43 @@ int find_next_positon(int x, int y, int type) {
 }
 
 int can_update(int x, int y) {
-    return !world_indexer[x][y].updated;
+    return !world_indexer_r[x][y].updated;
+}
+
+void resolve_conflicts(int to_x, int to_y, int to_type, int to_breeding, int to_starvation, int updated) {
+    int result_type = world_indexer[to_x][to_y].type;
+
+    if( result_type == EMPTY ) {
+        world_indexer[to_x][to_y].breeding_period = to_breeding;
+        world_indexer[to_x][to_y].starvation_period = to_starvation;
+
+    } else if( result_type == WOLF ){
+        world_indexer[to_x][to_y].breeding_period = to_breeding;
+        world_indexer[to_x][to_y].starvation_period = to_type == SQUIRREL ? wolf_starvation : to_starvation;
+
+    } else if( result_type == SQUIRREL ){
+        int result_type_breeding = world_indexer[to_x][to_y].starvation_period;
+        int squirrel_breed = to_breeding <= result_type_breeding ? to_breeding : result_type_breeding;
+
+        world_indexer[to_x][to_y].breeding_period = to_type == SQUIRREL ? squirrel_breed : to_breeding;
+        world_indexer[to_x][to_y].starvation_period = to_type == WOLF ? wolf_breeding : to_starvation;
+    } else if(result_type == TREE) {
+        world_indexer[to_x][to_y].breeding_period = to_breeding;
+    }
+      
+    world_indexer[to_x][to_y].type = to_type;
+    if ( updated ) { 
+        world_indexer[to_x][to_y].updated = 1; 
+    }
 }
 
 void update_position(int from_x, int from_y, int from_type, 
     int to_x, int to_y, int to_type, int from_breeding, int from_starvation, int to_breeding, int to_starvation) {
-    world_indexer[to_x][to_y].type = to_type;
 
     if( can_update(from_x , from_y) ) {
-        world_indexer[to_x][to_y].breeding_period = to_breeding;
-        world_indexer[to_x][to_y].starvation_period = to_starvation;
-        world_indexer[to_x][to_y].updated = 1;
+        resolve_conflicts(to_x, to_y, to_type, to_breeding, to_starvation, 1);
     } else {
-        world_indexer[to_x][to_y].breeding_period = from_breeding;
-        world_indexer[to_x][to_y].starvation_period = from_starvation;
+        resolve_conflicts(to_x, to_y, to_type, from_breeding, from_starvation, 0);
     }
 
     world_indexer[from_x][from_y].type = from_type;
@@ -369,6 +401,19 @@ void go_left(int x, int y, int type, int breeding, int starvation) {
     }
 }
 
+void no_move(int x, int y, int type, int breeding, int starvation) {
+    world_indexer[x][y].type = type;
+    if ( can_update(x, y) ) {
+        world_indexer[x][y].updated = 1;
+        if(world_indexer_r[x][y].starvation_period > 0) {
+            world_indexer[x][y].starvation_period = starvation -1;
+        }
+        if(world_indexer_r[x][y].breeding_period > 0) {
+            world_indexer[x][y].breeding_period = breeding - 1;
+        }
+    }
+}
+
 void move(int x, int y, int type) {
     int next_position = find_next_positon(x, y, type);
     int breeding = world_indexer_r[x][y].breeding_period;
@@ -388,12 +433,7 @@ void move(int x, int y, int type) {
         go_left( x, y, type, breeding, starvation);
         break;
         default:
-        if(world_indexer[x][y].starvation_period > 0) {
-            world_indexer[x][y].starvation_period--;
-        }
-        if(world_indexer[x][y].breeding_period > 0) {
-            world_indexer[x][y].breeding_period--;
-        }
+        no_move( x, y, type, breeding, starvation);
         return;
     }
 }
@@ -404,7 +444,8 @@ void baby(int x, int y, int type){
         world_indexer[x][y].breeding_period = wolf_breeding;
         world_indexer[x][y].starvation_period = wolf_starvation;
         world_indexer[x][y].updated = 1;
-    } else {
+    }
+    else if (type == SQUIRREL || type == SQUIRREL_TREE) {
         world_indexer[x][y].type = type;
         world_indexer[x][y].breeding_period = squirrel_breeding;
         world_indexer[x][y].starvation_period = 0;
@@ -435,12 +476,7 @@ void breed(int x, int y, int type) {
         baby(x, y, type);
         break;
         default:
-        if(world_indexer[x][y].starvation_period > 0) {
-            world_indexer[x][y].starvation_period--;
-        }
-        if(world_indexer[x][y].breeding_period > 0) {
-            world_indexer[x][y].breeding_period--;
-        }
+        no_move( x, y, type, breeding, starvation);
         return;
     }
 }
@@ -465,11 +501,20 @@ void exodus(int x, int y){
         else {
             move(x, y, type);
         }
+    } else if(type != EMPTY) {
+        world_indexer[x][y].type = type;
     }
 }
 
+void move_entity(int x, int y) {
+    world_indexer[x][y].type = world_indexer_r[x][y].type;
+    world_indexer[x][y].breeding_period = world_indexer_r[x][y].breeding_period;
+    world_indexer[x][y].starvation_period = world_indexer_r[x][y].starvation_period;
+    world_indexer[x][y].updated = world_indexer_r[x][y].updated;
+}
+
 void sub_generation(int black_generation){
-    int i, j;
+    int i, j, k;
 
     for(i = 0; i < world_size; i++) {
         if( black_generation ) {
@@ -477,9 +522,28 @@ void sub_generation(int black_generation){
         } else {
             j = ( i % 2 == 0) ? 0 : 1;
         }
-        while( j < world_size) {
-            exodus(i, j);
-            j = j + 2;
+
+        for( k = 0; k < world_size; k++) {
+            if( k == j) {
+                exodus(i, j);
+                j = j + 2;
+            } else {
+                //printf("Updated: %d\n", world_indexer[i][k].updated);
+                if(world_indexer_r[i][k].type != EMPTY && world_indexer[i][k].updated == 0) {
+                    move_entity(i, k);
+                }
+            }
+        }
+    }
+}
+
+// CANCRO
+void cancer() {
+    int i, k;
+
+    for(i = 0; i < world_size; i++) {
+        for( k = 0; k < world_size; k++) {
+            world_indexer[i][k].updated = 0;
         }
     }
 }
@@ -487,6 +551,10 @@ void sub_generation(int black_generation){
 
 int main(int argc, char *argv[]) {
     int i;
+    clock_t start_t, end_t; 
+    double total_t;
+
+    start_t = clock();
 
     printf("Welcome to Squirrels and Wolves\n");
 
@@ -503,18 +571,31 @@ int main(int argc, char *argv[]) {
     // process input
     genesis( fopen(argv[1], "r"), wolf_breeding, squirrel_breeding, wolf_starvation);
 
+    print_matrix(world_size);
     // process generations
     for( i = 0; i < num_generation; i++) {
         // 1st subgeneration
-        copy_matrix(world_size, TRUE);
+        new_matrix();
         sub_generation(FALSE);
+        printf("======GEN %d =====\nRED:\n", i); print_matrix(world_size);
 
         // 2nd subgeneration
-        copy_matrix(world_size, FALSE);
+        new_matrix();
         sub_generation(TRUE);
+
+        printf("BLACK:\n"); print_matrix(world_size);
+
+        cancer();
     }
 
+    printf("\n");
+    print_matrix(world_size);
     printf("Final:\n"); fflush(stdout);
     print_final_matrix(world_size); fflush(stdout);
+
+    end_t = clock();
+    total_t = (double) (end_t - start_t) / CLOCKS_PER_SEC;
+    printf("TOTAL: %f\n", total_t);
+
     return 0;
 }
