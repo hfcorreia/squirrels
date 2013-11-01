@@ -67,8 +67,11 @@ void print_final_matrix(int world_size) {
 
 void print_matrix(int world_size) {
     int i, j;
-    for(i = 0; i < world_size; i++) {
+    for(i = -1; i < world_size; i++) {
         for(j = 0; j < world_size; j++) {
+            if( i == -1) {
+                printf("|%d", j % 10);
+            } else {
             printf("%c", '|');
             switch(world_indexer[i][j].type) {
                 case SQUIRREL:
@@ -91,6 +94,7 @@ void print_matrix(int world_size) {
                 break;
             }
         }
+    }
         printf("|\n");
     }
 }
@@ -179,10 +183,6 @@ void genesis(FILE *fp, int wolves_breeding_period, int squirrels_breeding_period
         world_indexer[world_x][world_y].type = entity_number;
         world_indexer[world_x][world_y].updated = 0;
     }
-
-
-
-    printf("TOTAL SERIAL INPUT: %f\n", (double) (clock() - start_t) / CLOCKS_PER_SEC );
 }
 
 int is_free_position(int x, int y, int type) {

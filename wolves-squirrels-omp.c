@@ -95,6 +95,7 @@ void print_matrix(int world_size) {
                 break;
             }
         }
+    
         printf("|\n");
     }
 }
@@ -155,57 +156,43 @@ void initialization(int world_size) {
 /** Read's file and populates the world */
 void genesis(FILE *fp, int wolves_breeding_period, int squirrels_breeding_period, int wolves_starvation_period) {
     int world_x, world_y;
-    char entity;
     int entity_number;
-
-   // clock_t start_t;
-
-   // start_t = clock();
-
-    //double start = omp_get_wtime();
+    char entity;
 
     fscanf(fp, "%d", &world_size);
     initialization(world_size);
-
-
+    
     while (fscanf(fp, "%d %d %c",&world_x, &world_y, &entity) != EOF) { // expect 1 successful conversion
-            switch(entity) {
-                case 's':
-                entity_number = SQUIRREL;
-                world_indexer[world_x][world_y].breeding_period = squirrels_breeding_period;
-                world_indexer[world_x][world_y].starvation_period = 0;
-                break;
-                case 'w':
-                entity_number = WOLF;
-                world_indexer[world_x][world_y].breeding_period = wolves_breeding_period;
-                world_indexer[world_x][world_y].starvation_period = wolves_starvation_period;
-                break;
-                case 't':
-                entity_number = TREE;
-                world_indexer[world_x][world_y].breeding_period = 0;
-                world_indexer[world_x][world_y].starvation_period = 0;
-                break;
-                case 'i':
-                entity_number = ICE;
-                world_indexer[world_x][world_y].breeding_period = 0;
-                world_indexer[world_x][world_y].starvation_period = 0;
-                break;
-                default:
-                entity_number = EMPTY;
-                world_indexer[world_x][world_y].breeding_period = 0;
-                world_indexer[world_x][world_y].starvation_period = 0;
-                break;
-            }
-            world_indexer[world_x][world_y].type = entity_number;
-            world_indexer[world_x][world_y].updated = 0;
+        switch(entity) {
+            case 's':
+            entity_number = SQUIRREL;
+            world_indexer[world_x][world_y].breeding_period = squirrels_breeding_period;
+            world_indexer[world_x][world_y].starvation_period = 0;
+            break;
+            case 'w':
+            entity_number = WOLF;
+            world_indexer[world_x][world_y].breeding_period = wolves_breeding_period;
+            world_indexer[world_x][world_y].starvation_period = wolves_starvation_period;
+            break;
+            case 't':
+            entity_number = TREE;
+            world_indexer[world_x][world_y].breeding_period = 0;
+            world_indexer[world_x][world_y].starvation_period = 0;
+            break;
+            case 'i':
+            entity_number = ICE;
+            world_indexer[world_x][world_y].breeding_period = 0;
+            world_indexer[world_x][world_y].starvation_period = 0;
+            break;
+            default:
+            entity_number = EMPTY;
+            world_indexer[world_x][world_y].breeding_period = 0;
+            world_indexer[world_x][world_y].starvation_period = 0;
+            break;
+        }
+        world_indexer[world_x][world_y].type = entity_number;
+        world_indexer[world_x][world_y].updated = 0;
     }
-   
-
-    fclose(fp);
-   //double end = omp_get_wtime();
-
-   // printf("Genesys thread %d time %f\n", omp_get_thread_num(), end - start);
-   // printf("Clock %f\n", (double) (clock() - start_t) / CLOCKS_PER_SEC);
 }
 
 int is_free_position(int x, int y, int type) {
@@ -308,7 +295,7 @@ int can_update(int x, int y) {
 }
 
 void resolve_conflicts(int to_x, int to_y, int to_type, int to_breeding, int to_starvation, int updated) {
-    //omp_set_lock( &world_lock[to_x][to_y] );
+   // omp_set_lock( &world_lock[to_x][to_y] );
 //    double start = omp_get_wtime();
 
     int result_type = world_indexer[to_x][to_y].type;
@@ -346,7 +333,7 @@ void resolve_conflicts(int to_x, int to_y, int to_type, int to_breeding, int to_
         world_indexer[to_x][to_y].breeding_period = to_breeding;
     }
    // if ( updated ) { 
-        world_indexer[to_x][to_y].updated = 1; 
+    world_indexer[to_x][to_y].updated = 1; 
     //}
    //omp_unset_lock( &world_lock[to_x][to_y] );
 
@@ -357,7 +344,7 @@ void resolve_conflicts(int to_x, int to_y, int to_type, int to_breeding, int to_
 void update_position(int from_x, int from_y, int from_type, 
     int to_x, int to_y, int to_type, int from_breeding, int from_starvation, int to_breeding, int to_starvation) {
 
-    
+
     if( can_update(from_x , from_y) ) {
         resolve_conflicts(to_x, to_y, to_type, to_breeding, to_starvation, 1);
     } else {
@@ -389,7 +376,7 @@ void move_squirrel(int from_x, int from_y, int to_x, int to_y, int breeding) {
 }
 
 void move_wolves(int from_x, int from_y, int to_x, int to_y, int breeding, int starvation) {
-    
+
     int to_type = world_indexer_r[to_x][to_y].type;
     int to_breeding = world_indexer_r[to_x][to_y].breeding_period;
     int to_starvation = world_indexer_r[to_x][to_y].starvation_period;

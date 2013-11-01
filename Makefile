@@ -4,7 +4,7 @@ FILE = wolves-squirrels-serial.c
 PFILE = wolves-squirrels-omp.c
 OMPFLAG = -fopenmp
 all: parallel
-	$(CC) -o wolves-squirrels-serial $(FILE) $(CFLAGS)
+	$(CC) -o wolves-squirrels-serial $(FILE) $(CFLAGS) -O3
 
 parallel:
 	$(CC) -o wolves-squirrels-omp $(PFILE) $(CFLAGS) $(OMPFLAG)
