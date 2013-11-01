@@ -150,8 +150,6 @@ void genesis(FILE *fp, int wolves_breeding_period, int squirrels_breeding_period
     fscanf(fp, "%d", &world_size);
     initialization(world_size);
 
-    clock_t start_t = clock();
-    
     while (fscanf(fp, "%d %d %c",&world_x, &world_y, &entity) != EOF) { // expect 1 successful conversion
         switch(entity) {
             case 's':
@@ -189,7 +187,6 @@ int is_free_position(int x, int y, int type) {
     if( type == WOLF) {
         return  world_indexer_r[x][y].type == EMPTY || world_indexer_r[x][y].type == SQUIRREL;
     } else {
-        // for types squirrel and squirrel tree
         return  world_indexer_r[x][y].type == EMPTY || world_indexer_r[x][y].type == TREE;
     }
 }
@@ -319,9 +316,7 @@ void resolve_conflicts(int to_x, int to_y, int to_type, int to_breeding, int to_
         world_indexer[to_x][to_y].breeding_period = to_breeding;
     }
 
-    //if ( updated ) { 
         world_indexer[to_x][to_y].updated = 1; 
-    //}
 }
 
 void update_position(int from_x, int from_y, int from_type, 
@@ -563,7 +558,6 @@ void sub_generation(int black_generation){
                 exodus(i, j);
                 j = j + 2;
             } else {
-                //printf("Updated: %d\n", world_indexer[i][k].updated);
                 if(world_indexer_r[i][k].type != EMPTY && world_indexer[i][k].updated == 0) {
                     move_entity(i, k);
                 }
@@ -589,7 +583,6 @@ int main(int argc, char *argv[]) {
     clock_t start_t, end_t; 
     double total_t;
 
-    start_t = clock();
 
     printf("Welcome to Squirrels and Wolves\n");
 
@@ -606,7 +599,8 @@ int main(int argc, char *argv[]) {
     // process input
     genesis( fopen(argv[1], "r"), wolf_breeding, squirrel_breeding, wolf_starvation);
 
-  //  print_matrix(world_size);
+
+    start_t = clock();
 
     // process generations
     for( i = 0; i < num_generation; i++) {
@@ -614,19 +608,15 @@ int main(int argc, char *argv[]) {
         new_matrix();
         sub_generation(FALSE);
 
-       // printf("======GEN %d =====\nRED:\n", i); print_matrix(world_size);fflush(stdout);
 
         // 2nd subgeneration
         new_matrix();
         sub_generation(TRUE);
 
-        //printf("BLACK:\n"); print_matrix(world_size);fflush(stdout);
 
         cancer();
     }
 
-   // printf("\n");
-    //print_matrix(world_size);
     printf("Final:\n"); fflush(stdout);
     print_final_matrix(world_size); fflush(stdout);
 
