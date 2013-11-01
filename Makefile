@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -Wall -Wextra
+CFLAGS = -g
 FILE = wolves-squirrels-serial.c
 PFILE = wolves-squirrels-omp.c
 OMPFLAG = -fopenmp

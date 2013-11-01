@@ -4,8 +4,8 @@ if [ "$#" -ne 5 ]; then
     exit 1
 fi
 echo "### Running Serial"
-./wolves-squirrels-serial $1 $2 $3 $4 $5 > serial.out 
+./wolves-squirrels-serial $1 $2 $3 $4 $5 > /tmp/serial.out 
 echo "### Running Parallel"
-./wolves-squirrels-omp $1 $2 $3 $4 $5 > parallel.out
+./wolves-squirrels-omp $1 $2 $3 $4 $5 > /tmp/parallel.out
 echo "### Diff"
-diff serial.out parallel.out
+diff /tmp/serial.out /tmp/parallel.out

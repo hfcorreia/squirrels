@@ -31,7 +31,7 @@ world** world_indexer;
 world* world_array_r;
 world** world_indexer_r;
 world* old_array;
-world** old_indexer;
+
 
 int world_size;
 int wolf_breeding;
@@ -96,30 +96,29 @@ void print_matrix(int world_size) {
 }
 
 world* new_array() {
-    return (world*)malloc(sizeof(world)*world_size*world_size);   
+    return (world*)calloc( world_size*world_size , sizeof(world));   
 }
 
 world** new_indexer() {
-    return (world**)malloc(sizeof(world*)*world_size);
+    return (world**)calloc( world_size, sizeof(world*));
 }
 
 void new_matrix() {
     int i;
-    world* aux_array = new_array();
-    world** aux_indexer = new_indexer();
+    world* n_array = new_array();
 
     for (i = 0; i < world_size; ++i) {
-        aux_indexer[i] = &aux_array[i*world_size];
+        world_indexer_r[i] = &world_array[i*world_size];
+        world_indexer[i] = &n_array[i*world_size];
     }
 
-    old_indexer = world_indexer_r;
     old_array = world_array_r;
 
-    world_indexer_r = world_indexer;
     world_array_r = world_array;
 
-    world_indexer = aux_indexer;
-    world_array = aux_array;
+    world_array = n_array;
+
+    free(old_array);
 }
 
 /** Allocates space for the world. */
@@ -143,9 +142,12 @@ void genesis(FILE *fp, int wolves_breeding_period, int squirrels_breeding_period
     int entity_number;
     char entity;
 
+
     fscanf(fp, "%d", &world_size);
     initialization(world_size);
 
+    clock_t start_t = clock();
+    
     while (fscanf(fp, "%d %d %c",&world_x, &world_y, &entity) != EOF) { // expect 1 successful conversion
         switch(entity) {
             case 's':
@@ -177,6 +179,10 @@ void genesis(FILE *fp, int wolves_breeding_period, int squirrels_breeding_period
         world_indexer[world_x][world_y].type = entity_number;
         world_indexer[world_x][world_y].updated = 0;
     }
+
+
+
+    printf("TOTAL SERIAL INPUT: %f\n", (double) (clock() - start_t) / CLOCKS_PER_SEC );
 }
 
 int is_free_position(int x, int y, int type) {
@@ -205,7 +211,7 @@ int can_move_left(int x, int y, int type) {
 }
 
 int* find_free_positions(int x, int y, int type) {
-    int *array = (int*) malloc(sizeof(int)*4);
+    int *array = (int*) calloc(4, sizeof(int));
 
     array[UP] = can_move_up(x,y, type);
     array[RIGHT] = can_move_right(x, y, type);
@@ -216,7 +222,7 @@ int* find_free_positions(int x, int y, int type) {
 }
 
 int* find_squirrels(int x, int y) {
-    int *array = (int*) malloc(sizeof(int)*4);
+    int *array = (int*) calloc(4, sizeof(int));
 
     array[UP] = x - 1 >= 0 && world_indexer_r[x-1][y].type == SQUIRREL;
     array[RIGHT] = y + 1 < world_size && world_indexer_r[x][y+1].type == SQUIRREL;
@@ -255,13 +261,20 @@ int find_next_positon(int x, int y, int type) {
 
     int free_counter = count_free_positions(free_positions);
     int squirrel_counter = count_free_positions(free_squirrels);
+    int direction;
 
     if( type == WOLF &&  squirrel_counter > 0) {
         position = c % squirrel_counter;
-        return calculate_direction(free_squirrels, position);
+        direction = calculate_direction(free_squirrels, position);
+        free(free_squirrels);
+        free(free_positions);
+        return direction;
     } else if ( free_counter > 0 ) {
         position = c % free_counter;
-        return calculate_direction(free_positions, position);
+        direction = calculate_direction(free_positions, position);
+        free(free_positions);
+        free(free_squirrels);
+        return direction;
     } else {
         return -1;
     }
@@ -275,27 +288,40 @@ void resolve_conflicts(int to_x, int to_y, int to_type, int to_breeding, int to_
     int result_type = world_indexer[to_x][to_y].type;
 
     if( result_type == EMPTY ) {
+        world_indexer[to_x][to_y].type = to_type;
         world_indexer[to_x][to_y].breeding_period = to_breeding;
         world_indexer[to_x][to_y].starvation_period = to_starvation;
-
-    } else if( result_type == WOLF ){
+    }
+    else if( to_type == SQUIRREL && result_type == WOLF) {
+        world_indexer[to_x][to_y].starvation_period = wolf_starvation;
+    }
+    else if( to_type == WOLF && result_type == SQUIRREL) {
+        world_indexer[to_x][to_y].type = to_type;
         world_indexer[to_x][to_y].breeding_period = to_breeding;
-        world_indexer[to_x][to_y].starvation_period = to_type == SQUIRREL ? wolf_starvation : to_starvation;
-
-    } else if( result_type == SQUIRREL ){
-        int result_type_breeding = world_indexer[to_x][to_y].starvation_period;
-        int squirrel_breed = to_breeding <= result_type_breeding ? to_breeding : result_type_breeding;
-
-        world_indexer[to_x][to_y].breeding_period = to_type == SQUIRREL ? squirrel_breed : to_breeding;
-        world_indexer[to_x][to_y].starvation_period = to_type == WOLF ? wolf_breeding : to_starvation;
+        world_indexer[to_x][to_y].starvation_period = wolf_starvation;
+    }
+    else if( (to_type == SQUIRREL && result_type == SQUIRREL) || (to_type == SQUIRREL_TREE && result_type == SQUIRREL_TREE) ) {
+        world_indexer[to_x][to_y].breeding_period = world_indexer[to_x][to_y].breeding_period <= to_breeding ?
+        to_breeding : world_indexer[to_x][to_y].breeding_period;
+    }
+    else if( to_type == WOLF && result_type == WOLF) {
+        if(world_indexer[to_x][to_y].starvation_period < to_starvation) {
+            world_indexer[to_x][to_y].starvation_period = to_starvation;
+            world_indexer[to_x][to_y].breeding_period = to_breeding;
+        }
+        else if(world_indexer[to_x][to_y].starvation_period == to_starvation) {
+            if(world_indexer[to_x][to_y].breeding_period < to_breeding) {
+                world_indexer[to_x][to_y].breeding_period = to_breeding;
+            }
+        }
     } else if(result_type == TREE) {
+        world_indexer[to_x][to_y].type = to_type;
         world_indexer[to_x][to_y].breeding_period = to_breeding;
     }
-      
-    world_indexer[to_x][to_y].type = to_type;
-    if ( updated ) { 
+
+    //if ( updated ) { 
         world_indexer[to_x][to_y].updated = 1; 
-    }
+    //}
 }
 
 void update_position(int from_x, int from_y, int from_type, 
@@ -321,10 +347,11 @@ void move_squirrel(int from_x, int from_y, int to_x, int to_y, int breeding) {
 
     if( to_type == TREE) {
         update_position(from_x, from_y, EMPTY, to_x, to_y, SQUIRREL_TREE, breeding , 0, breeding - 1, 0);
-    } else if( to_type ==  SQUIRREL ) {
+    } /* else if( to_type ==  SQUIRREL ) {
+        printf("I AM A SQUIRREL");
         int resulting_breeding = to_breeding <= breeding ? to_breeding : breeding;
         update_position(from_x, from_y, EMPTY, to_x, to_y, SQUIRREL, breeding, 0, resulting_breeding, 0);
-    } else {
+    }*/ else {
         update_position(from_x, from_y, EMPTY, to_x, to_y, SQUIRREL, breeding, 0, breeding - 1, 0);
     }
 }
@@ -337,11 +364,12 @@ void move_wolves(int from_x, int from_y, int to_x, int to_y, int breeding, int s
 
     if ( to_type == SQUIRREL ) {
         update_position( from_x, from_y, EMPTY, to_x, to_y, WOLF, breeding, starvation, breeding - 1, wolf_starvation);
-    } else if ( to_type == WOLF ) {
-        int resulting_breeding = to_breeding <= breeding ? to_breeding : breeding;
+    } /*else if ( to_type == WOLF ) {
+        printf("I AM A WOLF");
+        int resulting_breeding = to_breeding <= breeding ? breeding : to_breeding;
         int resulting_starvation = to_starvation <= starvation ? starvation : to_starvation;
         update_position( from_x, from_y, EMPTY, to_x, to_y, WOLF, breeding, starvation, resulting_breeding, resulting_starvation);
-    } else {
+    }*/ else {
         update_position( from_x, from_y, EMPTY, to_x, to_y, WOLF, breeding, starvation, breeding - 1, starvation - 1);
     }
 }
@@ -353,10 +381,11 @@ void move_squirrel_trees(int from_x, int from_y, int to_x, int to_y, int breedin
 
     if( to_type == TREE) {
         update_position( from_x, from_y, TREE, to_x, to_y, SQUIRREL_TREE, breeding, 0, breeding - 1, 0);
-    } else if( to_type ==  SQUIRREL ) {
+    } /*else if( to_type ==  SQUIRREL ) {
+        printf("I AM A SQUIRREL_TREE");
         int resulting_breeding = to_breeding <= breeding ? to_breeding : breeding;
         update_position( from_x, from_y, TREE, to_x, to_y, SQUIRREL, breeding, 0, resulting_breeding, 0);
-    } else {
+    } */else {
         update_position( from_x, from_y, TREE, to_x, to_y, SQUIRREL, breeding, 0, breeding - 1, 0);
     }
 }
@@ -455,8 +484,14 @@ void baby(int x, int y, int type){
 
 void breed(int x, int y, int type) {
     int next_position = find_next_positon(x, y, type);
-    int breeding = world_indexer_r[x][y].breeding_period;
     int starvation = world_indexer_r[x][y].starvation_period;
+    int breeding;
+
+    if(type == SQUIRREL || type == SQUIRREL_TREE) {
+        breeding = squirrel_breeding;
+    } else {
+        breeding = wolf_breeding;
+    }
 
     switch(next_position) {
         case UP:
@@ -571,31 +606,33 @@ int main(int argc, char *argv[]) {
     // process input
     genesis( fopen(argv[1], "r"), wolf_breeding, squirrel_breeding, wolf_starvation);
 
-    print_matrix(world_size);
+  //  print_matrix(world_size);
+
     // process generations
     for( i = 0; i < num_generation; i++) {
         // 1st subgeneration
         new_matrix();
         sub_generation(FALSE);
-        printf("======GEN %d =====\nRED:\n", i); print_matrix(world_size);
+
+       // printf("======GEN %d =====\nRED:\n", i); print_matrix(world_size);fflush(stdout);
 
         // 2nd subgeneration
         new_matrix();
         sub_generation(TRUE);
 
-        printf("BLACK:\n"); print_matrix(world_size);
+        //printf("BLACK:\n"); print_matrix(world_size);fflush(stdout);
 
         cancer();
     }
 
-    printf("\n");
-    print_matrix(world_size);
+   // printf("\n");
+    //print_matrix(world_size);
     printf("Final:\n"); fflush(stdout);
     print_final_matrix(world_size); fflush(stdout);
 
     end_t = clock();
     total_t = (double) (end_t - start_t) / CLOCKS_PER_SEC;
-    printf("TOTAL: %f\n", total_t);
+    printf("TOTAL SERIAL: %f\n", total_t);
 
     return 0;
 }
