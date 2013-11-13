@@ -27,109 +27,20 @@ typedef struct world_cell {
 typedef struct position {
     int x;
     int y;
-    int is_breading;
     cell* cell;
+    int is_breeding;
 } position;
-
-typedef struct move {
-    position* actual_position;
-    position* next_position;
-    struct move* next;
-} move;
-
-
-typedef struct queue {
-    struct move* head;
-    struct move* tail;
-} queue;
 
 cell* world_array;
 cell** world_indexer;
+
+cell* world_array_read;
+cell** world_indexer_read;
 
 int world_size;
 int wolf_breeding;
 int squirrel_breeding;
 int wolf_starvation;
-
-/* Will always return the pointer to queue */
-queue* add_move(queue* s, position* actual_position, position* next_position) {
-    move* p = (move*) calloc( 1 , sizeof(*p) );
-
-    if( NULL == p ) {
-        fprintf(stderr, "IN %s, %s: malloc() failed\n", __FILE__, "list_add");
-        return s; 
-    }
-
-    p->actual_position = actual_position;
-    p->next_position = next_position;
-    p->next = NULL;
-
-    if( NULL == s ) {
-        printf("Queue not initialized\n");
-        free(p);
-        return s;
-    }
-    else if( NULL == s->head && NULL == s->tail ) {
-        /* printf("Empty list, adding p->num: %d\n\n", p->num);  */
-        s->head = s->tail = p;
-        return s;
-    }
-    else if( NULL == s->head || NULL == s->tail ) {
-        fprintf(stderr, "There is something seriously wrong with your assignment of head/tail to the list\n");
-        free(p);
-        return NULL;
-    }
-    else {
-        /* printf("List not empty, adding element to tail\n"); */
-        s->tail->next = p;
-        s->tail = p;
-    }
-
-    return s;
-}
-
-/* This is a queue and it is FIFO, so we will always remove the first element */
-move* remove_move( queue* s )
-{
-    move* h = NULL;
-    move* p = NULL;
-
-    if( NULL == s )
-    {
-        printf("List is empty\n");
-        return s;
-    }
-    else if( NULL == s->head && NULL == s->tail )
-    {
-        printf("Well, List is empty\n");
-        return s;
-    }
-    else if( NULL == s->head || NULL == s->tail )
-    {
-        printf("There is something seriously wrong with your list\n");
-        printf("One of the head/tail is empty while other is not \n");
-        return s;
-    }
-
-    h = s->head;
-    p = h->next;
-    s->head = p;
-    if( NULL == s->head )  s->tail = s->head;   /* The element tail was pointing to is free(), so we need an update */
-
-    return h;
-}
-
-queue* create_queue(void) {
-    queue* p = (queue*) calloc( 1 , sizeof(queue));
-
-    if( NULL == p ) {
-        fprintf(stderr, "LINE: %d, malloc() failed\n", __LINE__);
-    }
-
-    p->head = p->tail = NULL;
-
-    return p;
-}
 
 /** prints the final output */
 void output(void) {
@@ -201,9 +112,12 @@ void initialization() {
 
     world_array = (cell*) calloc( world_size*world_size , sizeof(cell));   
     world_indexer = (cell**) calloc( world_size, sizeof(cell*));
+    world_array_read = (cell*) calloc( world_size*world_size , sizeof(cell));   
+    world_indexer_read = (cell**) calloc( world_size, sizeof(cell*));
 
     for (i = 0; i < world_size; ++i) {
         world_indexer[i] = &world_array[i*world_size];
+        world_indexer_read[i] = &world_array_read[i*world_size];
     }
 }
 
@@ -248,50 +162,34 @@ void genesis(FILE *fp) {
     }
 }
 
-int is_free_position(int x, int y, int type) {
+int is_free_position(int x, int y, int type){
     if( type == WOLF) {
-        return ( world_indexer[x][y].type == EMPTY || world_indexer[x][y].type == SQUIRREL) && world_indexer[x][y].type != type;
+        return ( world_indexer_read[x][y].type == EMPTY || world_indexer_read[x][y].type == SQUIRREL) && world_indexer_read[x][y].type != type;
     } else {
-        return ( world_indexer[x][y].type == EMPTY || world_indexer[x][y].type == TREE) && world_indexer[x][y].type != type;
+        return ( world_indexer_read[x][y].type == EMPTY || world_indexer_read[x][y].type == TREE) && world_indexer_read[x][y].type != type;
     }
 }
 
-int can_move_up(int x, int y, int type) {
-    return x - 1 >= 0 && is_free_position(x-1, y, type);
-}
-
-int can_move_right(int x, int y, int type) {
-    return y + 1 < world_size && is_free_position(x, y+1, type);
-}
-
-int can_move_down(int x, int y, int type) {
-    return x + 1 < world_size && is_free_position(x+1, y, type);
-}
-
-int can_move_left(int x, int y, int type) {
-    return y - 1 >= 0 && is_free_position(x, y-1, type);
-}
-
-int* find_free_positions(position* actual_position) {
+int* find_free_positions(position* actual) {
     int *array = (int*) calloc(4, sizeof(int));
-    int x = actual_position->x, y = actual_position->y, type = actual_position->cell->type;
+    int x = actual->x, y = actual->y, type = actual->cell->type;
 
-    array[UP] = can_move_up(x,y, type);
-    array[RIGHT] = can_move_right(x, y, type);
-    array[DOWN] = can_move_down(x, y, type);
-    array[LEFT] = can_move_left(x, y, type);
+    array[UP] = x - 1 >= 0 && is_free_position(x-1, y, type);
+    array[RIGHT] = y + 1 < world_size && is_free_position(x, y+1, type);
+    array[DOWN] = x + 1 < world_size && is_free_position(x+1, y, type);
+    array[LEFT] = y - 1 >= 0 && is_free_position(x, y-1, type);
 
     return array;
 }
 
-int* find_squirrels(position *actual_position) {
+int* find_squirrels(position *actual) {
     int *array = (int*) calloc(4, sizeof(int));
-    int x = actual_position->x, y = actual_position->y;
+    int x = actual->x, y = actual->y;
 
-    array[UP] = x - 1 >= 0 && world_indexer[x-1][y].type == SQUIRREL;
-    array[RIGHT] = y + 1 < world_size && world_indexer[x][y+1].type == SQUIRREL;
-    array[DOWN] = x + 1 < world_size && world_indexer[x+1][y].type == SQUIRREL;
-    array[LEFT] = y - 1 >= 0 && world_indexer[x][y-1].type == SQUIRREL;
+    array[UP] = x - 1 >= 0 && world_indexer_read[x-1][y].type == SQUIRREL;
+    array[RIGHT] = y + 1 < world_size && world_indexer_read[x][y+1].type == SQUIRREL;
+    array[DOWN] = x + 1 < world_size && world_indexer_read[x+1][y].type == SQUIRREL;
+    array[LEFT] = y - 1 >= 0 && world_indexer_read[x][y-1].type == SQUIRREL;
 
     return array;
 }
@@ -306,14 +204,14 @@ int count_free_positions(int* free_positions) {
     return counter;
 }
 
-int calculate_direction(int *possible_positions, int next_position){
+int calculate_direction(int *possible_positions, int next){
     int direction;
 
     for ( direction = 0; direction < 4 ; direction++){
         if( possible_positions[direction] ) { 
-            next_position--;
+            next--;
         }
-        if ( next_position == -1 ) {
+        if ( next == -1 ) {
             return direction;
         }
     }
@@ -321,16 +219,16 @@ int calculate_direction(int *possible_positions, int next_position){
     return -1;
 }
 
-int find_next_positon(position *actual_position) {
-    int* free_positions = find_free_positions(actual_position);
-    int* free_squirrels = find_squirrels(actual_position);
-    int c = actual_position->x * world_size + actual_position->y;
+int find_next_positon(position *actual) {
+    int* free_positions = find_free_positions(actual);
+    int* free_squirrels = find_squirrels(actual);
+    int c = actual->x * world_size + actual->y;
 
     int free_counter = count_free_positions(free_positions);
     int squirrel_counter = count_free_positions(free_squirrels);
     int direction = -1;
 
-    if( actual_position->cell->type == WOLF &&  squirrel_counter > 0) {
+    if( actual->cell->type == WOLF &&  squirrel_counter > 0) {
         int next = c % squirrel_counter;
         direction = calculate_direction(free_squirrels, next);
     } else if ( free_counter > 0 ) {
@@ -344,211 +242,221 @@ int find_next_positon(position *actual_position) {
     return direction;
 }
 
-position* go_up(position *actual_position) {
-    position* next_position = (position*) calloc( 1, sizeof(position) );
-    cell* next_cell = (cell*) calloc( 1, sizeof(cell));
+void wolf(position* actual, position* next) {
+    int x = next->x, y = next->y;
 
-    next_position->x = actual_position->x - 1;
-    next_position->y = actual_position->y;
+    int type = world_indexer[x][y].type;
+    int actual_breeding = world_indexer[actual->x][actual->y].breeding;
+    int actual_starvation = world_indexer[actual->x][actual->y].starvation;
 
-    next_cell->type = world_indexer[next_position->x][next_position->y].type;
-    next_cell->starvation = world_indexer[next_position->x][next_position->y].starvation;
-    next_cell->breeding = world_indexer[next_position->x][next_position->y].breeding;
-
-    next_position->cell = next_cell;
-
-    return next_position;
-}
-
-position* go_right(position *actual_position) {
-    position* next_position = (position*) calloc( 1, sizeof(position) );
-    cell* next_cell = (cell*) calloc( 1, sizeof(cell));
-
-    next_position->x = actual_position->x;
-    next_position->y = actual_position->y + 1;
-
-    next_cell->type = world_indexer[next_position->x][next_position->y].type;
-    next_cell->starvation = world_indexer[next_position->x][next_position->y].starvation;
-    next_cell->breeding = world_indexer[next_position->x][next_position->y].breeding;
-
-    next_position->cell = next_cell;
-
-    return next_position;
-}
-
-position* go_down(position *actual_position) {
-    position* next_position = (position*) calloc( 1, sizeof(position) );
-    cell* next_cell = (cell*) calloc( 1, sizeof(cell));
-
-    next_position->x = actual_position->x + 1;
-    next_position->y = actual_position->y;
-
-    next_cell->type = world_indexer[next_position->x][next_position->y].type;
-    next_cell->starvation = world_indexer[next_position->x][next_position->y].starvation;
-    next_cell->breeding = world_indexer[next_position->x][next_position->y].breeding;
-
-    next_position->cell = next_cell;
-
-    return next_position;
-}
-
-position* go_left(position *actual_position) {
-    position* next_position = (position*) calloc( 1, sizeof(position) );
-    cell* next_cell = (cell*) calloc( 1, sizeof(cell));
-
-    next_position->x = actual_position->x;
-    next_position->y = actual_position->y - 1;
-
-    next_cell->type = world_indexer[next_position->x][next_position->y].type;
-    next_cell->starvation = world_indexer[next_position->x][next_position->y].starvation;
-    next_cell->breeding = world_indexer[next_position->x][next_position->y].breeding;
-
-    next_position->cell = next_cell;
-
-    return next_position;
-}
-
-// note must verify if is going to the same cell
-position* no_move(position *actual_position) {
-    position* next_position = (position*) calloc( 1, sizeof(position) );
-    cell* next_cell = (cell*) calloc( 1, sizeof(cell));
-
-    next_position->x = actual_position->x;
-    next_position->y = actual_position->y;
-
-    next_cell->type = world_indexer[next_position->x][next_position->y].type;
-    next_cell->starvation = world_indexer[next_position->x][next_position->y].starvation;
-    next_cell->breeding = world_indexer[next_position->x][next_position->y].breeding;
-
-    next_position->cell = next_cell;
-
-    return next_position;
-}
-
-position* die(position* actual_position) {
-    position* next_position = (position*) calloc( 1, sizeof(position) );
-    cell* next_cell = (cell*) calloc( 1, sizeof(cell));
-
-    next_position->x = actual_position->x;
-    next_position->y = actual_position->y;
-    
-    next_cell->type = EMPTY;
-    next_cell->starvation = 0;
-    next_cell->breeding = 0;
-
-    next_position->cell = next_cell;
-
-    return next_position;
-}
-
-position* go(position *actual_position) {
-    int next_position = find_next_positon(actual_position);
-
-    switch(next_position) {
-        case UP:
-            return go_up( actual_position );
-            break;
-        case RIGHT:
-            return go_right( actual_position );
-            break;
-        case DOWN:
-            return go_down( actual_position );
-            break;
-        case LEFT:
-            return go_left( actual_position );
-            break;
-        default:
-            return no_move( actual_position );
-    }
-
-}
-
-queue* breed(position *actual_position, queue* movements) {
-    int next_direction = find_next_positon(actual_position);
-    position* next_position;
-
-    switch(next_direction) {
-        case UP:
-            next_position = go_up( actual_position );
-            break;
-        case RIGHT:
-            next_position = go_right( actual_position );
-            break;
-        case DOWN:
-            next_position = go_down( actual_position );
-            break;
-        case LEFT:
-            next_position = go_left( actual_position );
-            break;
-        default:
-            //can not move 
-            actual_position->is_breading = 1;
-            return add_move(movements, actual_position, actual_position);
-    }
-
-    // move the original squirrel to next place
-    actual_position->is_breading = 1;
-    return add_move(movements, actual_position, next_position);
-}
-
-queue* move_squirrel(position *actual_position, queue* movements) {
-    if( actual_position->cell->breeding == 0 ) {
-        movements = breed(actual_position, movements);
-    } else {
-        position* next_position = go(actual_position);
-        movements = add_move( movements, actual_position, next_position);
-    }
-    return movements;
-}
-
-queue* move_squirrel_tree(position *actual_position, queue* movements) {
-    if( actual_position->cell->breeding == 0 ) {
-        movements = breed(actual_position, movements);
-    } else {
-        position* next_position = go(actual_position);
-        movements = add_move( movements, actual_position, next_position);
-    }
-    return movements;
-}
-
-queue* move_wolf(position *actual_position, queue* movements) {
-    if( actual_position->cell->starvation == 0 ) {
-        movements = add_move(movements, actual_position, die(actual_position));
-    } else if( actual_position->cell->breeding == 0 ) {
-        movements = breed(actual_position, movements);
-    } else {
-        position* next_position = go(actual_position);
-        movements = add_move( movements, actual_position, next_position);
-    }
-    return movements;
-}
-
-queue* exodus(int x, int y, queue* movements){
-    position* actual_position = (position*) calloc( 1, sizeof(position) );
-    actual_position->x = x;
-    actual_position->y = y;
-    actual_position->cell = &world_indexer[x][y];
-
-    int type = actual_position->cell->type;
-    move* movement;
     switch(type) {
+        case WOLF:
+            if( world_indexer[x][y].starvation < actual_starvation ) {
+                world_indexer[x][y].starvation = actual_starvation;
+                world_indexer[x][y].breeding = actual_breeding;
+            }
+            else if( world_indexer[x][y].starvation == actual_starvation) {
+                if( world_indexer[x][y].breeding < actual_breeding) {
+                    world_indexer[x][y].breeding = actual_breeding;
+                }
+            }
+            break;
+        case EMPTY:
+            world_indexer[x][y].starvation = actual_starvation;
+            world_indexer[x][y].breeding = actual_breeding;
+            break;
         case SQUIRREL:
-            movements = move_squirrel(actual_position, movements);
+            world_indexer[x][y].starvation = wolf_starvation;
+            world_indexer[x][y].breeding = actual_breeding;
+            break;
+    }
+
+    world_indexer[x][y].type = WOLF;
+}
+
+void squirrel(position* actual, position* next) {
+    int x = next->x, y = next->y;
+    int type = world_indexer[x][y].type;
+    int actual_breeding = world_indexer[actual->x][actual->y].breeding;
+
+    switch(type) {
+        case WOLF:
+            world_indexer[x][y].starvation = wolf_starvation;
+            break;
+        case EMPTY:
+            world_indexer[x][y].type = SQUIRREL;
+            world_indexer[x][y].starvation = 0;
+            world_indexer[x][y].breeding = actual_breeding;
+            break;
+        case TREE:
+            world_indexer[x][y].type = SQUIRREL_TREE;
+            world_indexer[x][y].starvation = 0;
+            world_indexer[x][y].breeding = actual_breeding;
             break;
         case SQUIRREL_TREE:
-            movements = move_squirrel_tree(actual_position, movements);
+            if(  world_indexer[x][y].breeding <= actual_breeding ) {
+                world_indexer[x][y].breeding = actual_breeding;
+            } 
             break;
-        case WOLF:
-            movements = move_wolf(actual_position, movements);
+        case SQUIRREL:
+            if(  world_indexer[x][y].breeding <= actual_breeding ) {
+                world_indexer[x][y].breeding = actual_breeding;
+            } 
             break;
     }
-    
-    return movements;
 }
 
-queue* sub_generation(int is_black_gen ){
+void normal_move(position* actual, position* next) {
+    int actual_type = actual->cell->type;
+
+    switch(actual_type) {
+        case WOLF:
+            wolf(actual, next);
+            break;
+        case SQUIRREL:
+            squirrel(actual, next);
+            break;
+        case SQUIRREL_TREE:
+            squirrel(actual, next);
+            break;
+    }
+}
+
+void die(position* actual) {
+    int x = actual->x, y = actual->y;
+
+    world_indexer[x][y].type = EMPTY;
+    world_indexer[x][y].starvation = 0;
+    world_indexer[x][y].breeding = 0;
+}
+
+void breed(position *actual) {
+    int x = actual->x, y = actual->y;
+    if( actual->is_breeding ) {
+        if( actual->cell->type == WOLF ) {
+            world_indexer[x][y].starvation = wolf_starvation;
+            world_indexer[x][y].breeding = wolf_breeding;
+        } else {
+            world_indexer[x][y].breeding = squirrel_breeding;
+        }
+    }
+}
+
+void breed_move(position* actual, position* next) {
+    breed(actual);
+    normal_move(actual, next);
+}
+
+void clear(position* actual) {
+    int x = actual->x, y = actual->y, type = actual->cell->type;
+
+    world_indexer[x][y].type = ( type == SQUIRREL_TREE ) ? TREE : EMPTY;
+    world_indexer[x][y].starvation = 0;
+    world_indexer[x][y].breeding = 0;
+}
+
+void move_element(position* actual, position* next) {
+    if( actual->is_breeding ) {
+        breed_move(actual, next);
+    } else {
+        normal_move(actual, next);
+        clear(actual);
+    }
+}
+
+void go_up(position *actual) {
+    position* next = (position*) calloc( 1, sizeof(position) );
+
+    next->x = actual->x - 1;
+    next->y = actual->y;
+    next->cell = &world_indexer_read[next->x][next->y];
+
+    move_element( actual, next);
+    free(next);
+}
+
+void go_right(position *actual) {
+    position* next = (position*) calloc( 1, sizeof(position) );
+
+    next->x = actual->x;
+    next->y = actual->y + 1;
+    next->cell = &world_indexer_read[next->x][next->y];
+
+    move_element( actual, next);
+    free(next);
+}
+
+void go_down(position *actual) {
+    position* next = (position*) calloc( 1, sizeof(position) );
+
+    next->x = actual->x + 1;
+    next->y = actual->y;
+    next->cell = &world_indexer_read[next->x][next->y];
+
+    move_element( actual, next);
+    free(next);
+}
+
+void go_left(position *actual) {
+    position* next = (position*) calloc( 1, sizeof(position) );
+
+    next->x = actual->x;
+    next->y = actual->y - 1;
+    next->cell = &world_indexer_read[next->x][next->y];
+
+    move_element( actual, next);
+    free(next);
+}
+
+void go(position *actual) {
+    int next = find_next_positon(actual);
+
+    switch(next) {
+        case UP:
+            go_up( actual );
+            break;
+        case RIGHT:
+            go_right( actual );
+            break;
+        case DOWN:
+            go_down( actual );
+            break;
+        case LEFT:
+            go_left( actual );
+            break;
+        default:
+            // can be breeding in the location without moving
+            breed( actual );
+            break;
+    }
+}
+
+void exodus(int x, int y) {
+    position* actual = (position*) calloc( 1, sizeof(position) );
+    actual->x = x;
+    actual->y = y;
+    actual->cell = &world_indexer_read[x][y];
+
+    int type = actual->cell->type;
+
+    if( SQUIRREL == type || SQUIRREL_TREE == type || WOLF == type ) {
+        if( actual->cell->starvation == 0 ) {
+            die(actual);
+            return;
+        }
+
+        if( actual->cell->breeding == 0 ) {
+            actual->is_breeding = 1;
+        }
+
+        go(actual);
+    }
+
+    free(actual);
+}
+
+void sub_generation(int is_black_gen ){
     int i, j;
-    queue* movements = create_queue();
 
     for(i = 0; i < world_size; i++) {
         if( is_black_gen ) {
@@ -558,83 +466,9 @@ queue* sub_generation(int is_black_gen ){
         }
 
         for( j = 0; j < world_size; j = j + 2) {
-            exodus(i, j, movements);
+            exodus(i, j);
         }
     }
-}
-
-int is_no_movement(position* actual_position, position* next_position) {
-    return actual_position->x == next_position->x && actual_position->y == next_position->y;
-}
-
-position* resolve_conflict( position* next_position ) {
-
-    return next_position;
-}
-
-void breeding_move(position* actual_position, position* next_position) {
-    if ( is_no_movement(actual_position, next_position) ) {
-        if ( actual_position->cell->type == WOLF ) {
-            world_indexer[actual_position->x][actual_position->y].breeding = wolf_breeding;
-            // starvation?
-        } else {
-            world_indexer[actual_position->x][actual_position->y].breeding = squirrel_breeding;
-        }
-    } else {
-        if ( actual_position->cell->type == WOLF ) {
-            world_indexer[actual_position->x][actual_position->y].breeding = wolf_breeding;
-            // starvation?
-            next_position->cell->breeding = wolf_breeding;
-        } else {
-            world_indexer[actual_position->x][actual_position->y].breeding = squirrel_breeding;
-            next_position->cell->breeding = squirrel_breeding;
-        }
-        resolve_conflict( next_position );
-    }
-}
-
-void normal_move(position* actual_position, position* next_position) {
-    if( actual_type == WOLF && next_type == EMPTY ) {
-
-    }
-    if( actual_type == WOLF && next_type == WOLF  ) {} // conflict
-    if( actual_type == WOLF && next_type == SQUIRREL ) {}
-
-    if( actual_type == SQUIRREL && next_type == EMPTY ) {}
-    if( actual_type == SQUIRREL && next_type == WOLF  ) {} // conflict
-    if( actual_type == SQUIRREL && next_type == SQUIRREL ) {} // conflict
-    if( actual_type == SQUIRREL && next_type == SQUIRREL_TREE ) {} // conflict
-    if( actual_type == SQUIRREL && next_type == TREE ) {}
-
-
-    if( actual_type == SQUIRREL_TREE && next_type == EMPTY ) {}
-    if( actual_type == SQUIRREL_TREE && next_type == WOLF  ) {} // conflict
-    if( actual_type == SQUIRREL_TREE && next_type == SQUIRREL ) {} // conflict
-    if( actual_type == SQUIRREL_TREE && next_type == SQUIRREL_TREE ) {} //conflict
-    if( actual_type == SQUIRREL_TREE && next_type == TREE ) {}
-}
-
-void move_element(position* actual_position, position* next_position) {
-    int actual_type = actual_position->cell->type;
-    int next_type = new_move->cell->type;
-
-    if( actual_type->is_breading ) {
-        breeding_move(actual_position, next_position);
-    } else if ( ! is_no_movement(actual_position, next_position) ) {
-        normal_move(actual_position, next_position);
-    } else {
-        world_indexer[x][y].type = next_position->cell->type;
-        world_indexer[x][y].starvation = next_position->cell->starvation;
-        world_indexer[x][y].breeding = next_position->cell->breeding;
-    }
-}
-
-void process_moves(queue* movements) {
-    while( movements->head != NULL ) {
-        move* new_move = remove_move(movements);
-        move_element( new_move->actual_position, new_move->next_position);
-    }
-
 }
 
 void update_generation() {
@@ -643,12 +477,23 @@ void update_generation() {
     for( i = 0 ; i < world_size ; i++ ) {
         for( j = 0 ; j < world_size ; j++ ) {
             int type = world_indexer[i][j].type;
+
             if ( type == WOLF ) {
                 if( world_indexer[i][j].starvation > 0 )  world_indexer[i][j].starvation--;
                 if( world_indexer[i][j].breeding > 0 )  world_indexer[i][j].breeding--;
-            } else if( type == SQUIRREL || type = SQUIRREL_TREE ) {
+            } else if( type == SQUIRREL || type == SQUIRREL_TREE ) {
                 if( world_indexer[i][j].breeding > 0 )  world_indexer[i][j].breeding--;
             }
+        }
+    }
+}
+
+void duplicate() {
+    int i, j;
+
+    for( i = 0; i < world_size; i++ ) {
+        for( j = 0; j < world_size; j++ ) {
+            world_indexer_read[i][j] = world_indexer[i][j];
         }
     }
 }
@@ -671,11 +516,22 @@ int main(int argc, char *argv[]) {
 
     start_t = clock();
 
+    printf("ORIGINAL WORLD\n");
+    print_world();
     // process generations
     for( i = 0; i < num_generation; i++) {
-        queue* red_movements = sub_generation(RED_GEN);
-        process_moves(red_movements);
-        queue* black_movements = sub_generation(BLK_GEN);
+        printf("========== GEN %d ===== \n", i);
+        duplicate();
+        sub_generation(RED_GEN);
+
+        printf("AFTER RED WORLD\n");
+        print_world();
+
+        duplicate();
+        sub_generation(BLK_GEN);
+
+        printf("\nAFTER BLACK WORLD\n");
+        print_world();
 
         update_generation();
     }
@@ -686,4 +542,3 @@ int main(int argc, char *argv[]) {
     output();
     return 0;
 }
-
