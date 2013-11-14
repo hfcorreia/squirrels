@@ -167,29 +167,40 @@ void genesis(FILE *fp) {
                 type_num = SQUIRREL;
                 world_indexer[x][y].breeding = squirrel_breeding;
                 world_indexer[x][y].starvation = 0;
+                world_indexer_read[x][y].breeding = squirrel_breeding;
+                world_indexer_read[x][y].starvation = 0;
                 break;
             case 'w':
                 type_num = WOLF;
                 world_indexer[x][y].breeding = wolf_breeding;
                 world_indexer[x][y].starvation =  wolf_starvation;
+                world_indexer_read[x][y].breeding = wolf_breeding;
+                world_indexer_read[x][y].starvation =  wolf_starvation;
                 break;
             case 't':
                 type_num = TREE;
                 world_indexer[x][y].breeding = 0;
                 world_indexer[x][y].starvation = 0;
+                world_indexer_read[x][y].breeding = 0;
+                world_indexer_read[x][y].starvation = 0;
                 break;
             case 'i':
                 type_num = ICE;
                 world_indexer[x][y].breeding = 0;
                 world_indexer[x][y].starvation = 0;
+                world_indexer_read[x][y].breeding = 0;
+                world_indexer_read[x][y].starvation = 0;
                 break;
             default:
                 type_num = EMPTY;
                 world_indexer[x][y].breeding = 0;
                 world_indexer[x][y].starvation = 0;
+                world_indexer_read[x][y].breeding = 0;
+                world_indexer_read[x][y].starvation = 0;
                 break;
         }
         world_indexer[x][y].type = type_num;
+        world_indexer_read[x][y].type = type_num;
     }
 }
 
@@ -519,6 +530,10 @@ void update_generation() {
             } else if( type == SQUIRREL || type == SQUIRREL_TREE ) {
                 if( world_indexer[i][j].breeding > 0 )  world_indexer[i][j].breeding--;
             }
+
+            world_indexer_read[i][j].type = world_indexer[i][j].type;
+            world_indexer_read[i][j].starvation = world_indexer[i][j].starvation;
+            world_indexer_read[i][j].breeding = world_indexer[i][j].breeding;
         }
     }
 }
@@ -559,7 +574,6 @@ int main(int argc, char *argv[]) {
     // process generations
     for( i = 0; i < num_generation; i++) {
         printf("========== GEN %d ===== \n", i);
-        duplicate();
         sub_generation(RED_GEN);
 
         printf("AFTER RED WORLD\n");
