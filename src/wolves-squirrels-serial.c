@@ -104,6 +104,37 @@ void print_world(void) {
         }
         printf("|\n");
     }
+    printf("READ\n");
+    for(i = -1; i < world_size; i++) {
+        for(j = 0; j < world_size; j++) {
+            if( i == -1) {
+                printf("|%d", j % 10);
+            } else {
+                printf("%c", '|');
+                switch(world_indexer_read[i][j].type) {
+                    case SQUIRREL:
+                        printf("%c", 's');
+                        break;
+                    case WOLF:
+                        printf("%c", 'w');
+                        break;
+                    case TREE:
+                        printf("%c", 't');
+                        break;
+                    case ICE:
+                        printf("%c", 'i');
+                        break;
+                    case SQUIRREL_TREE:
+                        printf("%c", '$');
+                        break;
+                    default:
+                        printf("%c", ' ');
+                        break;
+                }
+            }
+        }
+        printf("|\n");
+    }
 }
 
 /** Allocates space for the world. */
@@ -294,11 +325,14 @@ void squirrel(position* actual, position* next) {
             world_indexer[x][y].breeding = actual_breeding;
             break;
         case SQUIRREL_TREE:
+            world_indexer[x][y].type = SQUIRREL_TREE;
+            world_indexer[x][y].starvation = 0;
             if(  world_indexer[x][y].breeding <= actual_breeding ) {
                 world_indexer[x][y].breeding = actual_breeding;
             } 
             break;
         case SQUIRREL:
+            world_indexer[x][y].starvation = 0;
             if(  world_indexer[x][y].breeding <= actual_breeding ) {
                 world_indexer[x][y].breeding = actual_breeding;
             } 
@@ -438,9 +472,9 @@ void exodus(int x, int y) {
     actual->cell = &world_indexer_read[x][y];
 
     int type = actual->cell->type;
-
+    
     if( SQUIRREL == type || SQUIRREL_TREE == type || WOLF == type ) {
-        if( actual->cell->starvation == 0 ) {
+        if( actual->cell->starvation == 0 && WOLF == type) {
             die(actual);
             return;
         }
@@ -459,13 +493,14 @@ void sub_generation(int is_black_gen ){
     int i, j;
 
     for(i = 0; i < world_size; i++) {
+      int k;
         if( is_black_gen ) {
-            j = ( i % 2 == 0) ? 1 : 0;
+            k = ( i % 2 == 0) ? 1 : 0;
         } else {
-            j = ( i % 2 == 0) ? 0 : 1;
+            k = ( i % 2 == 0) ? 0 : 1;
         }
 
-        for( j = 0; j < world_size; j = j + 2) {
+        for( j = k ; j < world_size; j = j + 2) {
             exodus(i, j);
         }
     }
@@ -493,10 +528,13 @@ void duplicate() {
 
     for( i = 0; i < world_size; i++ ) {
         for( j = 0; j < world_size; j++ ) {
-            world_indexer_read[i][j] = world_indexer[i][j];
+            world_indexer_read[i][j].type = world_indexer[i][j].type;
+            world_indexer_read[i][j].starvation = world_indexer[i][j].starvation;
+            world_indexer_read[i][j].breeding = world_indexer[i][j].breeding;
         }
     }
 }
+
 int main(int argc, char *argv[]) {
     int i;
     clock_t start_t;
