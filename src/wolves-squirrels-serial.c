@@ -569,21 +569,21 @@ int main(int argc, char *argv[]) {
 
     start_t = clock();
 
-    printf("ORIGINAL WORLD\n");
-    print_world();
+    //printf("ORIGINAL WORLD\n");
+    //print_world();
     // process generations
     for( i = 0; i < num_generation; i++) {
-        printf("========== GEN %d ===== \n", i);
+     //   printf("========== GEN %d ===== \n", i);
         sub_generation(RED_GEN);
 
-        printf("AFTER RED WORLD\n");
-        print_world();
+      //  printf("AFTER RED WORLD\n");
+//        print_world();
 
         duplicate();
         sub_generation(BLK_GEN);
 
-        printf("\nAFTER BLACK WORLD\n");
-        print_world();
+       // printf("\nAFTER BLACK WORLD\n");
+//        print_world();
 
         update_generation();
     }
