@@ -530,23 +530,21 @@ void update_generation() {
             } else if( type == SQUIRREL || type == SQUIRREL_TREE ) {
                 if( world_indexer[i][j].breeding > 0 )  world_indexer[i][j].breeding--;
             }
-
-            world_indexer_read[i][j].type = world_indexer[i][j].type;
-            world_indexer_read[i][j].starvation = world_indexer[i][j].starvation;
-            world_indexer_read[i][j].breeding = world_indexer[i][j].breeding;
         }
+    }
+    memcpy(world_array_read, world_array, world_size*world_size*sizeof(cell));
+    for (i = 0; i < world_size; ++i) {
+        world_indexer_read[i] = &world_array_read[i*world_size];
     }
 }
 
 void duplicate() {
-    int i, j;
 
-    for( i = 0; i < world_size; i++ ) {
-        for( j = 0; j < world_size; j++ ) {
-            world_indexer_read[i][j].type = world_indexer[i][j].type;
-            world_indexer_read[i][j].starvation = world_indexer[i][j].starvation;
-            world_indexer_read[i][j].breeding = world_indexer[i][j].breeding;
-        }
+    memcpy(world_array_read, world_array, world_size*world_size*sizeof(cell));
+    int i;
+
+    for (i = 0; i < world_size; ++i) {
+        world_indexer_read[i] = &world_array_read[i*world_size];
     }
 }
 
