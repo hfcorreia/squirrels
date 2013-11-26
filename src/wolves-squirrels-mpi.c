@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
+#include <mpi.h>
 
 #define UP 0
 #define RIGHT 1
@@ -159,8 +159,16 @@ void genesis(FILE *fp) {
 
     fscanf(fp, "%d", &world_size);
 
+    /**
+     * wil change in mpi need to calculate the divisions based on the matrix
+     * size and the number of availables processes through mpi
+     */
     initialization(world_size);
 
+    /**
+     * Read the input and start sending the info at the same time to each
+     * process. This info is relative to it's assigned part of the world 
+     */
     while (fscanf(fp, "%d %d %c", &x, &y, &type) != EOF) {
         switch(type) {
             case 's':
@@ -550,7 +558,6 @@ void duplicate() {
 
 int main(int argc, char *argv[]) {
     int i;
-    clock_t start_t;
 
     if ( argc != 6 ) {
         printf("Invalid number of arguments!\n"); 
@@ -562,33 +569,22 @@ int main(int argc, char *argv[]) {
     wolf_starvation = atoi(argv[4]);
     int num_generation = atoi(argv[5]);
 
+
+    MPI_Init(&argc, &argv);
+
     // process input
     genesis( fopen(argv[1], "r") );
 
-    start_t = clock();
-
-    //printf("ORIGINAL WORLD\n");
-    //print_world();
-    // process generations
     for( i = 0; i < num_generation; i++) {
-     //   printf("========== GEN %d ===== \n", i);
         sub_generation(RED_GEN);
-
-      //  printf("AFTER RED WORLD\n");
-//        print_world();
 
         duplicate();
         sub_generation(BLK_GEN);
 
-       // printf("\nAFTER BLACK WORLD\n");
-//        print_world();
-
         update_generation();
     }
-
-    printf("TOTAL SERIAL: %f\n", (double) (clock() - start_t) / CLOCKS_PER_SEC );
-    
-    // process output
+   
+    MPI_Finalize();
     output();
     return 0;
 }

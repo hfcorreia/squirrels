@@ -2,10 +2,13 @@ CC = gcc
 CFLAGS = -g
 SERIAL = wolves-squirrels-serial
 PARALLEL = wolves-squirrels-omp
+MPI = wolves-squirrels-mpi
 OMPFLAG = -fopenmp
 
-all: parallel serial testgen
+all: mpi parallel serial testgen
 
+mpi: 
+	mpicc -o $(MPI) src/$(MPI).c 
 parallel: 
 	$(CC) $(CFLAGS) -o $(PARALLEL) src/$(PARALLEL).c $(OMPFLAG)
 
@@ -16,5 +19,5 @@ testgen:
 	$(CC) $(CFLAGS) -o testgen src/testgen.c
 
 clean:
-	rm $(SERIAL) $(PARALLEL) testgen
+	rm $(SERIAL) $(PARALLEL) testgen $(MPI)
 	find . -name "*.o" -exec rm -f {} \;
