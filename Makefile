@@ -8,7 +8,7 @@ OMPFLAG = -fopenmp
 all: mpi parallel serial testgen
 
 mpi: 
-	mpicc -o $(MPI) src/$(MPI).c 
+	mpicc -o $(MPI) src/$(MPI).c  -g
 parallel: 
 	$(CC) $(CFLAGS) -o $(PARALLEL) src/$(PARALLEL).c $(OMPFLAG)
 

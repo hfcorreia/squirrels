@@ -568,7 +568,7 @@ int main(int argc, char *argv[]) {
     start_t = clock();
 
     //printf("ORIGINAL WORLD\n");
-    //print_world();
+    print_world();
     // process generations
     for( i = 0; i < num_generation; i++) {
      //   printf("========== GEN %d ===== \n", i);
