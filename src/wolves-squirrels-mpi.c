@@ -20,18 +20,20 @@
 
 #define CHUNK_SIZE 0
 #define CHUNK_MSG 1
+#define END_SIZE 2
+#define END_MSG 3
 
 typedef struct world_cell {
-    int type;
-    int breeding;
-    int starvation;
+  int type;
+  int breeding;
+  int starvation;
 } cell;
 
 typedef struct position {
-    int x;
-    int y;
-    cell* cell;
-    int is_breeding;
+  int x;
+  int y;
+  cell* cell;
+  int is_breeding;
 } position;
 
 cell* world_array;
@@ -44,190 +46,158 @@ int world_size;
 int wolf_breeding;
 int squirrel_breeding;
 int wolf_starvation;
-
-/** prints the final output */
-void output(int pid) {
-    int i, j;
-
-    printf("Final at %d:\n", pid); 
-    for(i = 0; i < world_size; i++) {
-        for(j = 0; j < world_size; j++) {
-            switch(world_indexer[i][j].type) {
-                case SQUIRREL:
-                    printf("%d %d %c\n", i, j, 's');
-                    break;
-                case WOLF:
-                    printf("%d %d %c\n", i, j, 'w');
-                    break;
-                case TREE:
-                    printf("%d %d %c\n", i, j, 't');
-                    break;
-                case ICE:
-                    printf("%d %d %c\n", i, j, 'i');
-                    break;
-                case SQUIRREL_TREE:
-                    printf("%d %d %c\n", i, j, '$');
-                    break;
-            }
-        }
-    };
-    
-    fflush(stdout);
-}
+int num_processes;
 
 void print_world(int pid, int world_size, int chunk_size, int end_size) {
-    int i, j;
+  int i, j;
 
-    printf("WORLD %d, chunk_size %d: PID %d\n", world_size, chunk_size, pid);
-    if(pid == 0) chunk_size = end_size;
-    for(i = -1; i < chunk_size ; i++) {
-        for(j = 0; j < world_size ; j++) {
-            if( i == -1) {
-                printf("|%d", j % 10);
-            } else {
-                printf("%c", '|');
-                switch(world_indexer[i][j].type) {
-                    case SQUIRREL:
-                        printf("%c", 's');
-                        break;
-                    case WOLF:
-                        printf("%c", 'w');
-                        break;
-                    case TREE:
-                        printf("%c", 't');
-                        break;
-                    case ICE:
-                        printf("%c", 'i');
-                        break;
-                    case SQUIRREL_TREE:
-                        printf("%c", '$');
-                        break;
-                    default:
-                        printf("%c", ' ');
-                        break;
-                }
-            }
+  printf("WORLD %d, chunk_size %d: PID %d\n", world_size, chunk_size, pid);
+  if(pid == 0) chunk_size = end_size;
+  for(i = -1; i < chunk_size ; i++) {
+    for(j = 0; j < world_size ; j++) {
+      if( i == -1) {
+        printf("|%d", j % 10);
+      } else {
+        printf("%c", '|');
+        switch(world_indexer[i][j].type) {
+          case SQUIRREL:
+            printf("%c", 's');
+            break;
+          case WOLF:
+            printf("%c", 'w');
+            break;
+          case TREE:
+            printf("%c", 't');
+            break;
+          case ICE:
+            printf("%c", 'i');
+            break;
+          case SQUIRREL_TREE:
+            printf("%c", '$');
+            break;
+          default:
+            printf("%c", ' ');
+            break;
         }
-        printf("|\n");
+      }
     }
-    printf("READ\n");
-    for(i = -1; i < chunk_size ; i++) {
-        for(j = 0; j < world_size ; j++) {
-            if( i == -1) {
-                printf("|%d", j % 10);
-            } else {
-                printf("%c", '|');
-                switch(world_indexer_read[i][j].type) {
-                    case SQUIRREL:
-                        printf("%c", 's');
-                        break;
-                    case WOLF:
-                        printf("%c", 'w');
-                        break;
-                    case TREE:
-                        printf("%c", 't');
-                        break;
-                    case ICE:
-                        printf("%c", 'i');
-                        break;
-                    case SQUIRREL_TREE:
-                        printf("%c", '$');
-                        break;
-                    default:
-                        printf("%c", ' ');
-                        break;
-                }
-            }
+    printf("|\n");
+  }
+  printf("READ\n");
+  for(i = -1; i < chunk_size ; i++) {
+    for(j = 0; j < world_size ; j++) {
+      if( i == -1) {
+        printf("|%d", j % 10);
+      } else {
+        printf("%c", '|');
+        switch(world_indexer_read[i][j].type) {
+          case SQUIRREL:
+            printf("%c", 's');
+            break;
+          case WOLF:
+            printf("%c", 'w');
+            break;
+          case TREE:
+            printf("%c", 't');
+            break;
+          case ICE:
+            printf("%c", 'i');
+            break;
+          case SQUIRREL_TREE:
+            printf("%c", '$');
+            break;
+          default:
+            printf("%c", ' ');
+            break;
         }
-        printf("|\n");
+      }
     }
+    printf("|\n");
+  }
 }
 
 /** Allocates space for the world. */
 void initialization(int world_size, int chunk_size) {
-    int i;
+  int i;
 
-    world_array = (cell*) calloc( chunk_size *world_size , sizeof(cell));   
-    world_indexer = (cell**) calloc( chunk_size, sizeof(cell*));
-    world_array_read = (cell*) calloc( chunk_size*world_size , sizeof(cell));   
-    world_indexer_read = (cell**) calloc( chunk_size, sizeof(cell*));
+  world_array = (cell*) calloc( chunk_size *world_size , sizeof(cell));   
+  world_indexer = (cell**) calloc( chunk_size, sizeof(cell*));
+  world_array_read = (cell*) calloc( chunk_size*world_size , sizeof(cell));   
+  world_indexer_read = (cell**) calloc( chunk_size, sizeof(cell*));
 
-    for (i = 0; i < chunk_size; ++i) {
-        world_indexer[i] = &world_array[i*world_size];
-        world_indexer_read[i] = &world_array_read[i*world_size];
-    }
+  for (i = 0; i < chunk_size; ++i) {
+    world_indexer[i] = &world_array[i*world_size];
+    world_indexer_read[i] = &world_array_read[i*world_size];
+  }
 }
 
 /** Read's file and populates the world */
 void genesis(char *input, int pid, int num_processes) { 
-    char* save;
-    char* token = strtok_r(input, "\n", &save);
-    int chunk;
+  char* save;
+  char* token = strtok_r(input, "\n", &save);
+  int chunk;
 
-    world_size = atoi(token);
-    int chunk_size = world_size / num_processes;
-    int end_size; 
-    
-    if( pid == 0 )  {
-      chunk = num_processes;
-      end_size = world_size - (chunk - 1) * chunk_size;
-      end_size++;
-      initialization(world_size, end_size);
+  world_size = atoi(token);
+  int chunk_size = world_size / num_processes;
+  int end_size; 
+
+  if( pid == 0 )  {
+    chunk = num_processes;
+    end_size = world_size - (chunk - 1) * chunk_size;
+    end_size++;
+    initialization(world_size, end_size);
+  }
+  else {
+    chunk = pid;
+    ( pid == 1 ) ? initialization(world_size, chunk_size + 1) : initialization(world_size, chunk_size + 2);
+  }
+
+
+  while ( (token = strtok_r(NULL, "\n", &save)) != NULL ) {
+    int x, y, type_num;
+    char type;
+
+    sscanf( token, "%d %d %c", &x, &y, &type);
+    if(chunk != 1) {
+      x =  x - ((chunk - 1) * chunk_size - 1);
     }
-    else {
-      chunk = pid;
-      ( pid == 1 ) ? initialization(world_size, chunk_size + 1) : initialization(world_size, chunk_size + 2);
-      }
-
-
-    while ( (token = strtok_r(NULL, "\n", &save)) != NULL ) {
-      int x, y, type_num;
-      char type;
-
-      sscanf( token, "%d %d %c", &x, &y, &type);
-//      printf("pid= %d chunk= %d, antes x=%d,y=%d,type= %c, chunk_size= %d\n", pid, chunk, x, y, type, chunk_size);
-      if(chunk != 1) {
-        x =  x - ((chunk - 1) * chunk_size - 1);
-      }
-  //    printf("pid= %d, depois x=%d,y=%d,type= %c\n", pid, x, y, type);
-      switch(type) {
-        case 's':
-          type_num = SQUIRREL;
-          world_indexer[x][y].breeding = squirrel_breeding;
-          world_indexer[x][y].starvation = 0;
-          world_indexer_read[x][y].breeding = squirrel_breeding;
-          world_indexer_read[x][y].starvation = 0;
-          break;
-        case 'w':
-          type_num = WOLF;
-          world_indexer[x][y].breeding = wolf_breeding;
-          world_indexer[x][y].starvation =  wolf_starvation;
-          world_indexer_read[x][y].breeding = wolf_breeding;
-          world_indexer_read[x][y].starvation =  wolf_starvation;
-          break;
-        case 't':
-          type_num = TREE;
-          world_indexer[x][y].breeding = 0;
-          world_indexer[x][y].starvation = 0;
-          world_indexer_read[x][y].breeding = 0;
-          world_indexer_read[x][y].starvation = 0;
-          break;
-        case 'i':
-          type_num = ICE;
-          world_indexer[x][y].breeding = 0;
-          world_indexer[x][y].starvation = 0;
-          world_indexer_read[x][y].breeding = 0;
-          world_indexer_read[x][y].starvation = 0;
-          break;
-      }
-      world_indexer[x][y].type = type_num;
-      world_indexer_read[x][y].type = type_num;
+    switch(type) {
+      case 's':
+        type_num = SQUIRREL;
+        world_indexer[x][y].breeding = squirrel_breeding;
+        world_indexer[x][y].starvation = 0;
+        world_indexer_read[x][y].breeding = squirrel_breeding;
+        world_indexer_read[x][y].starvation = 0;
+        break;
+      case 'w':
+        type_num = WOLF;
+        world_indexer[x][y].breeding = wolf_breeding;
+        world_indexer[x][y].starvation =  wolf_starvation;
+        world_indexer_read[x][y].breeding = wolf_breeding;
+        world_indexer_read[x][y].starvation =  wolf_starvation;
+        break;
+      case 't':
+        type_num = TREE;
+        world_indexer[x][y].breeding = 0;
+        world_indexer[x][y].starvation = 0;
+        world_indexer_read[x][y].breeding = 0;
+        world_indexer_read[x][y].starvation = 0;
+        break;
+      case 'i':
+        type_num = ICE;
+        world_indexer[x][y].breeding = 0;
+        world_indexer[x][y].starvation = 0;
+        world_indexer_read[x][y].breeding = 0;
+        world_indexer_read[x][y].starvation = 0;
+        break;
     }
-
-    if(pid == 1 || pid == 0)
-    print_world(pid, world_size, chunk_size+1, end_size );
-    else
-    print_world(pid, world_size, chunk_size+2, end_size );
+    world_indexer[x][y].type = type_num;
+    world_indexer_read[x][y].type = type_num;
+  }
+  if( pid == 1 )
+    print_world(1, world_size, chunk_size + 1, 0);
+  else if( pid > 1 )
+    print_world(pid, world_size, chunk_size + 2, 0);
 }
 
 int is_free_position(int x, int y, int type){
@@ -639,12 +609,12 @@ char* send_input(FILE* fp, int num_processes) {
         free(tmp);
       } 
       else {
-    //    printf("pid %d tmp_line_before %s\n", pid, tmp_line_before);
-      //  printf("pid %d tmp_line_after %s\n", pid, tmp_line_after);
         if(pid != num_processes) {
           int length = strlen(sendBuffer) + 1;
+          //printf("Sending from 0 to %d\n", pid);
           MPI_Send(&length, 1, MPI_INT, pid, CHUNK_SIZE, MPI_COMM_WORLD);
           MPI_Send(sendBuffer, length, MPI_CHAR, pid, CHUNK_MSG, MPI_COMM_WORLD);
+          //printf("Sent from 0 to %d\n", pid);
           offset += chunk_size;
           free(sendBuffer);
 
@@ -659,8 +629,6 @@ char* send_input(FILE* fp, int num_processes) {
           *tmp_line_before = '\0';
           tmp_line_after = (char*) malloc(1);
           *tmp_line_after = '\0';
-
-  //        printf("pid %d sendBuffer after sending: %s\n", pid, sendBuffer);
         }
         if( pid == num_processes - 1 ) offset = world_size + 1;
         break;
@@ -677,14 +645,125 @@ char* receive_input() {
   MPI_Status status[2];
   int length;
   char *receive_buffer;
+ // printf("Receiving at 0\n");
   MPI_Recv(&length, 1, MPI_INT, 0, CHUNK_SIZE, MPI_COMM_WORLD, &status[0]);
   receive_buffer = (char *) malloc(length);
   MPI_Recv(receive_buffer, length, MPI_CHAR, 0, CHUNK_MSG, MPI_COMM_WORLD, &status[1]);
+ // printf("Received at 0\n");
   return receive_buffer;
 }
 
+char* get_movements(int chunk, int start, int end){
+  int i, j, chunk_size = world_size / num_processes;
+  char* movements = (char*) malloc(1); 
+  *movements = '\0';
+  for( i = start ;  i < end ; i++) {
+    printf("in cycle chunk %d\n\n", chunk);
+    for( j = 0 ;  j < world_size ; j++) {
+      int x = x =  i + ((chunk - 1) * chunk_size );
+      int type = world_indexer[i][j].type;
+      char sym;
+      char* move;
+
+      switch(type) {
+        case SQUIRREL:
+          sym = 's';
+          break;
+        case WOLF:
+          sym = 'w';
+          break;
+        case TREE:
+          sym = 't';
+          break;
+        case ICE:
+          sym = 'i';
+          break;
+        case SQUIRREL_TREE:
+          sym = '$';
+          break;
+        default:
+          continue;
+      }
+
+      
+      move = (char*) malloc(BUFFER);
+      sprintf( move, "%d %d %c\n", x, j, sym);
+
+      char* tmp_movements = (char*) malloc( strlen(move) + strlen(movements) + 1);
+      strcpy(tmp_movements, movements);
+      strcat(tmp_movements, move);
+
+      printf("TMP_MOV %d %s\n\n", chunk, tmp_movements);
+      char* aux = movements;
+      movements = tmp_movements;
+      free(aux);
+    }
+  }
+
+  return  movements;
+}
+
+char* end_result(int pid) {
+  int chunk_size = world_size / num_processes;
+
+  if( pid == 0 ) {
+    int end_size = world_size - (num_processes- 1) * chunk_size;
+    return get_movements( num_processes, 0, end_size);
+  } else if( pid == 1 ) {
+    return get_movements( pid, 0, chunk_size);
+  } else {
+    char* tmp = get_movements( pid, 0, chunk_size);
+    printf("end_rusult pid %d movements %s\n\n", pid, tmp);
+    return tmp;
+  }
+}
+
+/** Send output to master process */
+void final_send(int pid) {
+  if( pid != 0) {
+    char* sendBuffer = end_result(pid);
+    int length = strlen(sendBuffer) + 1;
+    //printf("Final send from %d to 0\n", pid);
+    MPI_Send(&length, 1, MPI_INT, 0, END_SIZE, MPI_COMM_WORLD);
+    MPI_Send(sendBuffer, length, MPI_CHAR, 0, END_MSG, MPI_COMM_WORLD);
+    //printf("Final sent from %d to 0\n", pid);
+  }
+}
+
+/** Process 0 receives the output from all nodes */
+char* final_receive() {
+  int pid;
+  char *result = (char*) malloc (1);
+  *result = '\0';
+
+  for( pid = 1 ; pid < num_processes ; pid++) {
+    MPI_Status status[2];
+    int length;
+    char *receive_buffer;
+
+    printf("Final receive at 0 from %d\n", pid);
+    MPI_Recv(&length, 1, MPI_INT, pid, END_SIZE, MPI_COMM_WORLD, &status[0]);
+    receive_buffer = (char *) malloc(length);
+    MPI_Recv(receive_buffer, length, MPI_CHAR, pid, END_MSG, MPI_COMM_WORLD, &status[1]);
+    printf("Final received at 0 from %d\n", pid);
+
+    printf("\n\n %s\n\n", receive_buffer);
+
+    char* result_tmp = (char*) malloc( strlen(result) + strlen(receive_buffer) + 1);
+    strcpy(result_tmp, result);
+    strcat(result_tmp, receive_buffer);
+
+    char* aux = result;
+    result = result_tmp;
+    free(aux);
+  }
+
+
+  return result;
+}
+
 int main(int argc, char *argv[]) {
-  int i, pid, num_processes;
+  int i, pid;
 
   if ( argc != 6 ) {
     printf("Invalid number of arguments!\n"); 
@@ -705,24 +784,22 @@ int main(int argc, char *argv[]) {
 
   // only the master reads input
   char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r"), num_processes) : receive_input();
-
-  if(pid==1)
   genesis(input, pid, num_processes);
 
+  final_send(pid);
+  if ( pid == 0 ) {
+    char* receive_all = final_receive();
+    char* receive_0 = end_result(0);
 
-  if( 1 == 0 ) {
-    for( i = 0; i < num_generation; i++) {
-      sub_generation(RED_GEN);
+    char* result = (char*) malloc ( strlen(receive_0) + strlen(receive_all) + 1);
 
-      duplicate();
-      sub_generation(BLK_GEN);
+    strcpy( result, receive_all);
+    strcat( result, receive_0);
 
-      update_generation();
-    }
+    printf("%s", result);
   }
 
   MPI_Finalize();
 
-  //output(pid); fflush(stdout);
   return 0;
 }
