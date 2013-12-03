@@ -249,10 +249,25 @@ int calculate_direction(int *possible_positions, int next){
   return -1;
 }
 
-int find_next_positon(position *actual) {
+int find_next_positon(int pid, position *actual) {
   int* free_positions = find_free_positions(actual);
   int* free_squirrels = find_squirrels(actual);
-  int c = actual->x * world_size + actual->y;
+  int c;
+  //int c = actual->x * world_size + actual->y;
+  int chunk;
+
+  if( pid == 0 ) {
+    chunk = num_processes;
+  }
+  else {
+    chunk = pid;
+  }
+
+  if(chunk != 1) {
+    c = (actual->x + ((chunk - 1) * chunk_size - 1)) * world_size + actual->y;
+  } else {
+    c = actual->x * world_size + actual->y;
+  }
 
   int free_counter = count_free_positions(free_positions);
   int squirrel_counter = count_free_positions(free_squirrels);
@@ -504,7 +519,7 @@ void add_tmp_line(int pid, position *position, int direction){
 }
 
 void go(int pid, position *actual) {
-  int next = find_next_positon(actual);
+  int next = find_next_positon(pid, actual);
 
   switch(next) {
     case UP:
@@ -563,14 +578,15 @@ void sub_generation(int is_black_gen, int pid){
   }
   else if( pid == 1 ) {
     i = 0;
-    size = chunk_size;
+    size = chunk_size + 1;
   } else {
     i = 1;
-    size = chunk_size;
+    size = chunk_size + 2;
   }
 
   for(; i < size; i++) {
     int k;
+
     if( is_black_gen ) {
       k = ( i % 2 == 0) ? 1 : 0;
     } else {
@@ -826,7 +842,7 @@ char* calc_line(int line) {
 
   for( i = 0 ; i < world_size ; i++ ) {
     int type = world_indexer[line][i].type;
-    if( EMPTY != type) {
+    if( EMPTY != type ) {
       char buffer[BUFFER];
       int breed = world_indexer[line][i].breeding;
       int starve = world_indexer[line][i].starvation;
@@ -934,6 +950,8 @@ void solve_conflict(position* position) {
 void apply_conflicts(int pid, char * received, int line_number) {
   char *token, *save;
 
+  if ( received == NULL ) return;
+
   while ( (token = strtok_r(received, "\n", &save)) != NULL ) {
     received = NULL;
     int x, y, type, breed, starve, is_breeding;
@@ -959,15 +977,8 @@ void apply_conflicts(int pid, char * received, int line_number) {
   }
 }
 
-void substitute(int pid, char* line) {
-  int line_number, i;
-  if( pid == 0 ) {
-    line_number = 0;
-  } else if( pid == 1 ) {
-    line_number = chunk_size;
-  } else {
-    // TODO: :D
-  }
+void substitute(int pid, char* line, int line_number) {
+  int i;
 
   // clear the ghost line
   for( i = 0 ; i < world_size ; i++ ) {
@@ -994,25 +1005,32 @@ void substitute(int pid, char* line) {
 }
 
 void apply_received(int pid, char* received) {
-  char *line;
-  char *movement_array = strtok_r(received, "|", &line);
+  char *line, *movement_array = NULL;
+  if( *received == '|' ) { 
+    char *save;
+    line = strtok_r(received, "|", &save);
+    movement_array = NULL;
+  }
+  else {
+    movement_array = strtok_r(received, "|", &line);
+  }
 
   // merge movement_array with line
   if( pid == 0 ) {
     apply_conflicts(pid, movement_array, 1);
+    substitute(pid , line, 0);
+    apply_conflicts(pid, top_ghost_line, 0);
+
+    //printf("PID %d AFTER APPLY 1\n", pid);
+    //print_world(pid, 0);
+
   } else if( pid == 1 ) {
     apply_conflicts(pid, movement_array, chunk_size - 1);
-  } else {
-
-  }
-
-  substitute(pid , line);
-  
-  // mirror process from the other chunk
-  if( pid == 0 ) {
-    apply_conflicts(pid, top_ghost_line, 0);
-  } else if( pid == 1 ) {
+    substitute(pid , line, chunk_size);
     apply_conflicts(pid, bottom_ghost_line, chunk_size);
+
+    //printf("PID %d AFTER APPLY 1\n", pid);
+    //print_world(pid, 0);
   } else {
 
   }
@@ -1093,15 +1111,20 @@ int main(int argc, char *argv[]) {
   char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r"), num_processes) : receive_input();
 
   genesis(input, pid, num_processes);
- // print_world(pid, i);
+  print_world(pid, i);
 
   for( i = 0; i < num_generation; i++) {
     sub_generation(RED_GEN, pid);
 
+    printf("\n\nPID %d TOP\n%s\n\n", pid, top_ghost_line);
+    printf("\n\nPID %d BOT\n%s\n\n", pid, bottom_ghost_line);
+
     resolve_conflicts(pid);
+    printf("\n\nPID %d AFTER CONFLICT\n", pid);
+    //print_world(pid, i);
     MPI_Barrier(MPI_COMM_WORLD);
-    // printf("\n\nPID %d TOP\n%s\n\n", pid, top_ghost_line);
-    // printf("\n\nPID %d BOT\n%s\n\n", pid, bottom_ghost_line);
+    //printf("\n\nPID %d TOP\n%s\n\n", pid, top_ghost_line);
+    //printf("\n\nPID %d BOT\n%s\n\n", pid, bottom_ghost_line);
     // print_world(pid, i);
     clear_ghost_line();
 
@@ -1111,10 +1134,10 @@ int main(int argc, char *argv[]) {
 
     resolve_conflicts(pid);
     MPI_Barrier(MPI_COMM_WORLD);
-    //print_world(pid, i);
+    print_world(pid, i);
     clear_ghost_line();
 
-    update_generation();
+    update_generation(); 
   }
 
   if ( pid == 0 ) {
@@ -1126,7 +1149,7 @@ int main(int argc, char *argv[]) {
     strcpy( result, receive_all);
     strcat( result, receive_0);
 
-    //printf("%s", result);
+    printf("%s", result);
   } else {
     final_send(pid);
   }
