@@ -64,7 +64,7 @@ void clear_ghost_line() {
   top_ghost_line = (char*) malloc(1); *top_ghost_line = '\0';
 }
 
-void print_world(int pid, int gen) { 
+void print_world(int pid, char* print) { 
   int i, j, size;
 
   if(pid == 0 || pid == 1 ) 
@@ -73,7 +73,7 @@ void print_world(int pid, int gen) {
     size = chunk_size + 2;
 
 
-  printf("WORLD %d, size %d: PID %d at generatio %d\n", world_size, size, pid, gen);
+  printf("WORLD %d PID %d %s \n", world_size, pid, print);
   for(i = -1; i < size ; i++) {
     if(i != -1) printf("|%d", i);
     for(j = 0; j < world_size ; j++) {
@@ -200,25 +200,40 @@ int is_free_position(int x, int y, int type){
   }
 }
 
-int* find_free_positions(position* actual) {
+int* find_free_positions(int pid, position* actual) {
   int *array = (int*) calloc(4, sizeof(int));
   int x = actual->x, y = actual->y, type = actual->cell->type;
+  int size;
+
+  if ( pid == 0 || pid == 1 ) {
+    size = chunk_size + 1;
+  } else {
+    size = chunk_size + 2;
+  }
+    
 
   array[UP] = x - 1 >= 0 && is_free_position(x-1, y, type);
   array[RIGHT] = y + 1 < world_size && is_free_position(x, y+1, type);
-  array[DOWN] = x + 1 < chunk_size && is_free_position(x+1, y, type);
+  array[DOWN] = x + 1 < size && is_free_position(x+1, y, type);
   array[LEFT] = y - 1 >= 0 && is_free_position(x, y-1, type);
 
   return array;
 }
 
-int* find_squirrels(position *actual) {
+int* find_squirrels(int pid, position *actual) {
   int *array = (int*) calloc(4, sizeof(int));
   int x = actual->x, y = actual->y;
+  int size;
+
+  if ( pid == 0 || pid == 1 ) {
+    size = chunk_size + 1;
+  } else {
+    size = chunk_size + 2;
+  }
 
   array[UP] = x - 1 >= 0 && world_indexer_read[x-1][y].type == SQUIRREL;
   array[RIGHT] = y + 1 < world_size && world_indexer_read[x][y+1].type == SQUIRREL;
-  array[DOWN] = x + 1 < chunk_size && world_indexer_read[x+1][y].type == SQUIRREL;
+  array[DOWN] = x + 1 < size && world_indexer_read[x+1][y].type == SQUIRREL;
   array[LEFT] = y - 1 >= 0 && world_indexer_read[x][y-1].type == SQUIRREL;
 
   return array;
@@ -250,8 +265,8 @@ int calculate_direction(int *possible_positions, int next){
 }
 
 int find_next_positon(int pid, position *actual) {
-  int* free_positions = find_free_positions(actual);
-  int* free_squirrels = find_squirrels(actual);
+  int* free_positions = find_free_positions(pid, actual);
+  int* free_squirrels = find_squirrels(pid, actual);
   int c;
   //int c = actual->x * world_size + actual->y;
   int chunk;
@@ -580,7 +595,7 @@ void sub_generation(int is_black_gen, int pid){
   else if( pid == 1 ) {
     i = 0;
     l = 0;
-    size = chunk_size + 1;
+    size = chunk_size;
   } else {
     i = 1;
     size = chunk_size + 2;
@@ -617,17 +632,19 @@ void update_generation() {
       }
     }
   }
-  memcpy(world_array_read, world_array, chunk_size*world_size*sizeof(cell));
-  for (i = 0; i < chunk_size ; ++i) {
-    world_indexer_read[i] = &world_array_read[i*world_size];
-  }
 }
 
-void duplicate() {
-  memcpy(world_array_read, world_array, chunk_size*world_size*sizeof(cell));
+void duplicate(int pid) {
+  int size = 0;
+  if( pid == 0 || pid == 1 ) {
+    size = chunk_size + 1;
+  } else {
+    size = chunk_size + 2;
+  }
+  memcpy(world_array_read, world_array, size*world_size*sizeof(cell));
   int i;
 
-  for (i = 0; i < chunk_size; ++i) {
+  for (i = 0; i < size; ++i) {
     world_indexer_read[i] = &world_array_read[i*world_size];
   }
 }
@@ -1024,16 +1041,11 @@ void apply_received(int pid, char* received) {
     substitute(pid , line, 0);
     apply_conflicts(pid, top_ghost_line, 0);
 
-    //printf("PID %d AFTER APPLY 1\n", pid);
-    //print_world(pid, 0);
-
   } else if( pid == 1 ) {
     apply_conflicts(pid, movement_array, chunk_size - 1);
     substitute(pid , line, chunk_size);
     apply_conflicts(pid, bottom_ghost_line, chunk_size);
 
-    //printf("PID %d AFTER APPLY 1\n", pid);
-    //print_world(pid, 0);
   } else {
 
   }
@@ -1114,33 +1126,28 @@ int main(int argc, char *argv[]) {
   char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r"), num_processes) : receive_input();
 
   genesis(input, pid, num_processes);
-  print_world(pid, i);
+  //print_world(pid, "ORIGINAL");
 
   for( i = 0; i < num_generation; i++) {
     sub_generation(RED_GEN, pid);
-
-    printf("\n\nPID %d TOP\n%s\n\n", pid, top_ghost_line);
-    printf("\n\nPID %d BOT\n%s\n\n", pid, bottom_ghost_line);
-
     resolve_conflicts(pid);
-    printf("\n\nPID %d AFTER CONFLICT\n", pid);
-    //print_world(pid, i);
     MPI_Barrier(MPI_COMM_WORLD);
-    //printf("\n\nPID %d TOP\n%s\n\n", pid, top_ghost_line);
-    //printf("\n\nPID %d BOT\n%s\n\n", pid, bottom_ghost_line);
-    // print_world(pid, i);
+
     clear_ghost_line();
 
-    duplicate();
+ //   print_world(pid, "AFTER RED GEN");
+    duplicate(pid);
 
     sub_generation(BLK_GEN, pid);
-
     resolve_conflicts(pid);
     MPI_Barrier(MPI_COMM_WORLD);
-    print_world(pid, i);
     clear_ghost_line();
 
     update_generation(); 
+
+    duplicate(pid);
+
+//    print_world(pid, "AFTER BLACK GEN");
   }
 
   if ( pid == 0 ) {
