@@ -31,13 +31,13 @@ typedef struct world_cell {
   int type;
   int breeding;
   int starvation;
+  int is_breeding;
 } cell;
 
 typedef struct position {
   int x;
   int y;
   cell* cell;
-  int is_breeding;
 } position;
 
 cell* world_array;
@@ -46,6 +46,9 @@ cell** world_indexer;
 cell* world_array_read;
 cell** world_indexer_read;
 
+char* top_ghost_line;
+char* bottom_ghost_line;
+
 int world_size;
 int chunk_size;
 int wolf_breeding;
@@ -53,16 +56,24 @@ int squirrel_breeding;
 int wolf_starvation;
 int num_processes;
 
-void print_world(int pid) { 
+void clear_ghost_line() {
+  free(top_ghost_line);
+  free(bottom_ghost_line);
+
+  bottom_ghost_line = (char*) malloc(1); *bottom_ghost_line = '\0';
+  top_ghost_line = (char*) malloc(1); *top_ghost_line = '\0';
+}
+
+void print_world(int pid, int gen) { 
   int i, j, size;
-  
+
   if(pid == 0 || pid == 1 ) 
     size = chunk_size + 1;
   else 
     size = chunk_size + 2;
 
 
-  printf("WORLD %d, size %d: PID %d\n", world_size, size, pid);
+  printf("WORLD %d, size %d: PID %d at generatio %d\n", world_size, size, pid, gen);
   for(i = -1; i < size ; i++) {
     if(i != -1) printf("|%d", i);
     for(j = 0; j < world_size ; j++) {
@@ -111,6 +122,9 @@ void initialization(int world_size, int chunk_size) {
     world_indexer[i] = &world_array[i*world_size];
     world_indexer_read[i] = &world_array_read[i*world_size];
   }
+
+  top_ghost_line = (char*) malloc(1); *top_ghost_line = '\0';
+  bottom_ghost_line = (char*) malloc(1); *bottom_ghost_line = '\0';
 }
 
 /** Read's file and populates the world */
@@ -347,11 +361,12 @@ void die(position* actual) {
   world_indexer[x][y].type = EMPTY;
   world_indexer[x][y].starvation = 0;
   world_indexer[x][y].breeding = 0;
+  world_indexer[x][y].is_breeding = 0;
 }
 
 void breed(position *actual) {
   int x = actual->x, y = actual->y;
-  if( actual->is_breeding ) {
+  if( actual->cell->is_breeding ) {
     if( actual->cell->type == WOLF ) {
       world_indexer[x][y].starvation = wolf_starvation;
       world_indexer[x][y].breeding = wolf_breeding;
@@ -372,10 +387,11 @@ void clear(position* actual) {
   world_indexer[x][y].type = ( type == SQUIRREL_TREE ) ? TREE : EMPTY;
   world_indexer[x][y].starvation = 0;
   world_indexer[x][y].breeding = 0;
+  world_indexer[x][y].is_breeding = 0;
 }
 
 void move_element(position* actual, position* next) {
-  if( actual->is_breeding ) {
+  if( actual->cell->is_breeding ) {
     breed_move(actual, next);
   } else {
     normal_move(actual, next);
@@ -427,17 +443,79 @@ void go_left(position *actual) {
   free(next);
 }
 
-void go(position *actual) {
+void add_tmp_line(int pid, position *position, int direction){
+  char buffer[BUFFER];
+  int x = position->x;
+  int y = position->y;
+  int type = position->cell->type;
+  int breed = position->cell->breeding;
+  int starvation = position->cell->starvation;
+  int is_breeding = position->cell->is_breeding;
+
+  x = ( UP  == direction) ? x - 1 : x + 1;
+
+  if( pid == 1 && x == chunk_size ) {
+    // add to tmp ghost bottom
+    sprintf(buffer, "%d %d %d %d %d %d\n", x, y, type, breed, starvation, is_breeding);
+    char *tmp = malloc( strlen(buffer) + strlen(bottom_ghost_line) + 1);
+
+    strcpy(tmp, bottom_ghost_line);
+    strcat(tmp, buffer);
+
+    char *aux = bottom_ghost_line;
+    bottom_ghost_line = tmp;
+    free(aux);
+
+  } else if ( pid == 0 && x == 0 ) {
+    // add to tmp ghost top
+    sprintf(buffer, "%d %d %d %d %d %d\n", x, y, type, breed, starvation, is_breeding);
+    char *tmp = malloc( strlen(buffer) + strlen(top_ghost_line) + 1);
+
+    strcpy(tmp, top_ghost_line);
+    strcat(tmp, buffer);
+
+    char *aux = top_ghost_line;
+    top_ghost_line = tmp;
+    free(aux);
+  } else if ( pid != 0 && pid != 1 && x == 0 ) {
+    // add to top ghost of 2 ghost chunk
+    sprintf(buffer, "%d %d %d %d %d %d\n", x, y, type, breed, starvation, is_breeding);
+    char *tmp = malloc( strlen(buffer) + strlen(top_ghost_line) + 1);
+
+    strcpy(tmp, top_ghost_line);
+    strcat(tmp, buffer);
+
+    char *aux = top_ghost_line;
+    top_ghost_line = tmp;
+    free(aux);
+  } else if ( pid != 0 && pid != 1 && x == chunk_size ) {
+    // add to bottom ghost of 2
+    sprintf(buffer, "%d %d %d %d %d %d\n", x, y, type, breed, starvation, is_breeding);
+    char *tmp = malloc( strlen(buffer) + strlen(bottom_ghost_line) + 1);
+
+    strcpy(tmp, bottom_ghost_line);
+    strcat(tmp, buffer);
+
+    char *aux = bottom_ghost_line;
+    bottom_ghost_line = tmp;
+    free(aux);
+  }
+
+}
+
+void go(int pid, position *actual) {
   int next = find_next_positon(actual);
 
   switch(next) {
     case UP:
+      add_tmp_line(pid, actual, UP);
       go_up( actual );
       break;
     case RIGHT:
       go_right( actual );
       break;
     case DOWN:
+      add_tmp_line(pid, actual, DOWN);
       go_down( actual );
       break;
     case LEFT:
@@ -450,7 +528,7 @@ void go(position *actual) {
   }
 }
 
-void exodus(int x, int y) {
+void exodus(int pid, int x, int y) {
   position* actual = (position*) calloc( 1, sizeof(position) );
   actual->x = x;
   actual->y = y;
@@ -465,10 +543,10 @@ void exodus(int x, int y) {
     }
 
     if( actual->cell->breeding == 0 ) {
-      actual->is_breeding = 1;
+      actual->cell->is_breeding = 1;
     }
 
-    go(actual);
+    go(pid, actual);
   }
 
   free(actual);
@@ -477,13 +555,17 @@ void exodus(int x, int y) {
 void sub_generation(int is_black_gen, int pid){
   int i, j, size;
 
+  // Don't process ghost lines
   if(pid == 0) {
-    // Nao processa a linha 0 da matriz (ghost line)
     i = 1;
-    size = chunk_size +1;
+    // final chunk size of pid 0 + 1 4 ghost
+    size =  world_size - (num_processes- 1) * chunk_size + 1;
   }
-  else {
+  else if( pid == 1 ) {
     i = 0;
+    size = chunk_size;
+  } else {
+    i = 1;
     size = chunk_size;
   }
 
@@ -496,7 +578,7 @@ void sub_generation(int is_black_gen, int pid){
     }
 
     for( j = k ; j < world_size; j = j + 2) {
-      exodus(i, j);
+      exodus(pid, i, j);
     }
   }
 }
@@ -738,36 +820,18 @@ char* final_receive() {
 }
 
 
-char* calc_ghost_line(int line1, int line2) {
+char* calc_line(int line) {
   int i;
   char *result = (char*) malloc(1); *result = '\0';
 
   for( i = 0 ; i < world_size ; i++ ) {
-    int type = world_indexer[line1][i].type;
-    if( ICE != type ) {
+    int type = world_indexer[line][i].type;
+    if( EMPTY != type) {
       char buffer[BUFFER];
-      int breed = world_indexer[line1][i].breeding;
-      int starve = world_indexer[line1][i].starvation;
-      sprintf(buffer, "%d %d %d %d %d\n", 0, i, type, breed, starve);
-
-      char* tmp_result = (char*) malloc( strlen(result) + strlen(buffer) + 1);
-
-      strcpy( tmp_result, result);
-      strcat( tmp_result, buffer);
-
-      char* tmp = result;
-      result = tmp_result;
-      free(tmp);
-    }
-  }
-
-  for( i = 0 ; i < world_size ; i++ ) {
-    int type = world_indexer[line2][i].type;
-    if( ICE != type && EMPTY != type ) {
-      char buffer[BUFFER];
-      int breed = world_indexer[line2][i].breeding;
-      int starve = world_indexer[line2][i].starvation;
-      sprintf(buffer, "%d %d %d %d %d\n", 1, i, type, breed, starve);
+      int breed = world_indexer[line][i].breeding;
+      int starve = world_indexer[line][i].starvation;
+      int is_breeding = world_indexer[line][i].is_breeding;
+      sprintf(buffer, "%d %d %d %d %d %d\n", 0, i, type, breed, starve, is_breeding);
 
       char* tmp_result = (char*) malloc( strlen(result) + strlen(buffer) + 1);
 
@@ -811,7 +875,7 @@ void wolf_conflicts(position* position) {
       world_indexer[x][y].breeding = position_breeding;
       break;
   }
-  
+
   world_indexer[x][y].type = WOLF;
 
 }
@@ -867,36 +931,93 @@ void solve_conflict(position* position) {
   }
 }
 
-void apply_conflicts(char * received, int pid) {
-  char* token, *save, *duplicate = received;
-  while ( (token = strtok_r(duplicate, "\n", &save)) != NULL ) {
-    int x, y, type, breed, starv;
-    duplicate = NULL;
-    sscanf(token, "%d %d %d %d %d", &x, &y, &type, &breed, &starv);
+void apply_conflicts(int pid, char * received, int line_number) {
+  char *token, *save;
+
+  while ( (token = strtok_r(received, "\n", &save)) != NULL ) {
+    received = NULL;
+    int x, y, type, breed, starve, is_breeding;
+
+    sscanf(token, "%d %d %d %d %d %d", &x, &y, &type, &breed, &starve, &is_breeding);
 
     position *new_position = (position*) malloc(sizeof(position));
     cell *new_cell = (cell*) malloc(sizeof(cell));
 
     new_cell->type = type;
     new_cell->breeding = breed;
-    new_cell->starvation = starv;
+    new_cell->starvation = starve;
+    new_cell->is_breeding = is_breeding;
 
     new_position->y = y;
     new_position->cell = new_cell;
+    new_position->x = line_number;
 
-    if(pid == 0) {
-      new_position->x = x;
-      solve_conflict(new_position);
-    } else if(pid == 1) {
-      new_position->x = ( x == 0 ) ? chunk_size - 1 : chunk_size;
-      solve_conflict(new_position);
-    }
-    else {
-    }
+    solve_conflict(new_position);
+
     free(new_cell);
     free(new_position);
   }
 }
+
+void substitute(int pid, char* line) {
+  int line_number, i;
+  if( pid == 0 ) {
+    line_number = 0;
+  } else if( pid == 1 ) {
+    line_number = chunk_size;
+  } else {
+    // TODO: :D
+  }
+
+  // clear the ghost line
+  for( i = 0 ; i < world_size ; i++ ) {
+    world_indexer[line_number][i].type = 0;
+    world_indexer[line_number][i].breeding = 0;
+    world_indexer[line_number][i].starvation = 0;
+    world_indexer[line_number][i].is_breeding = 0;
+  }
+
+  // update the ghost line with most recent values
+  char* token, *save;
+  while ( (token = strtok_r(line, "\n", &save)) != NULL ) {
+    line = NULL;
+    int x, y, type, breed, starve, is_breeding;
+
+    sscanf(token, "%d %d %d %d %d %d", &x, &y, &type, &breed, &starve, &is_breeding);
+
+    world_indexer[line_number][y].type = type;
+    world_indexer[line_number][y].breeding = breed;
+    world_indexer[line_number][y].starvation = starve;
+    world_indexer[line_number][y].is_breeding = is_breeding;
+  }
+
+}
+
+void apply_received(int pid, char* received) {
+  char *line;
+  char *movement_array = strtok_r(received, "|", &line);
+
+  // merge movement_array with line
+  if( pid == 0 ) {
+    apply_conflicts(pid, movement_array, 1);
+  } else if( pid == 1 ) {
+    apply_conflicts(pid, movement_array, chunk_size - 1);
+  } else {
+
+  }
+
+  substitute(pid , line);
+  
+  // mirror process from the other chunk
+  if( pid == 0 ) {
+    apply_conflicts(pid, top_ghost_line, 0);
+  } else if( pid == 1 ) {
+    apply_conflicts(pid, bottom_ghost_line, chunk_size);
+  } else {
+
+  }
+}
+
 
 void send_conflicts( char* results, int pid) {
   int length = strlen(results) + 1;
@@ -916,20 +1037,36 @@ char* receive_conflicts( int from_pid ) {
 }
 
 void resolve_conflicts(int pid) {
-  char* sent, *received;
+  char* line, *received, *send;
 
   if( pid == 0 ) {
-    sent = calc_ghost_line( 0, 1 );
-    send_conflicts( sent, num_processes - 1);
+    // joins given line with top-ghost-line
+    line = calc_line( 1 );
+    send = (char*) malloc( strlen(line) + strlen(top_ghost_line) + 2 );
+
+    strcpy( send, top_ghost_line);
+    strcat( send, "|");
+    strcat( send, line);
+
+    send_conflicts( send, num_processes - 1);
     received = receive_conflicts( num_processes - 1 );
+
+    apply_received(pid, received);
   } else if( pid == 1 ) {
-    sent = calc_ghost_line( chunk_size - 1, chunk_size );
-    send_conflicts( sent, (pid + 1) % num_processes );
+    line = calc_line( chunk_size -1 );
+    send = (char*) malloc( strlen(line) + strlen(bottom_ghost_line) + 2 );
+
+    strcpy( send, bottom_ghost_line);
+    strcat( send, "|");
+    strcat( send, line);
+
+    send_conflicts( send, (pid + 1) % num_processes );
     received = receive_conflicts( (pid + 1) % num_processes );
+
+    apply_received(pid, received);
   } else {
     /* TODO: resolve 4 2 critical zones */
   }
-  apply_conflicts( received , pid);
 }
 
 int main(int argc, char *argv[]) {
@@ -956,20 +1093,30 @@ int main(int argc, char *argv[]) {
   char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r"), num_processes) : receive_input();
 
   genesis(input, pid, num_processes);
+ // print_world(pid, i);
 
   for( i = 0; i < num_generation; i++) {
     sub_generation(RED_GEN, pid);
+
     resolve_conflicts(pid);
     MPI_Barrier(MPI_COMM_WORLD);
+    // printf("\n\nPID %d TOP\n%s\n\n", pid, top_ghost_line);
+    // printf("\n\nPID %d BOT\n%s\n\n", pid, bottom_ghost_line);
+    // print_world(pid, i);
+    clear_ghost_line();
 
     duplicate();
+
     sub_generation(BLK_GEN, pid);
 
     resolve_conflicts(pid);
     MPI_Barrier(MPI_COMM_WORLD);
+    //print_world(pid, i);
+    clear_ghost_line();
 
     update_generation();
   }
+
   if ( pid == 0 ) {
     char* receive_all = final_receive();
     char* receive_0 = end_result(0);
@@ -979,11 +1126,10 @@ int main(int argc, char *argv[]) {
     strcpy( result, receive_all);
     strcat( result, receive_0);
 
-    printf("%s", result);
+    //printf("%s", result);
   } else {
     final_send(pid);
   }
-  
 
   MPI_Finalize();
 
