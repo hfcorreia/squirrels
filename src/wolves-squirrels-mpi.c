@@ -568,29 +568,32 @@ void exodus(int pid, int x, int y) {
 }
 
 void sub_generation(int is_black_gen, int pid){
-  int i, j, size;
+  int i, j, l, size;
 
   // Don't process ghost lines
   if(pid == 0) {
     i = 1;
     // final chunk size of pid 0 + 1 4 ghost
     size =  world_size - (num_processes- 1) * chunk_size + 1;
+    l =  chunk_size * ( num_processes - 1 );
   }
   else if( pid == 1 ) {
     i = 0;
+    l = 0;
     size = chunk_size + 1;
   } else {
     i = 1;
     size = chunk_size + 2;
+    l =  chunk_size * ( num_processes - 1 );
   }
 
-  for(; i < size; i++) {
+  for( ; i < size; i++, l++) {
     int k;
 
     if( is_black_gen ) {
-      k = ( i % 2 == 0) ? 1 : 0;
+      k = ( l % 2 == 0) ? 1 : 0;
     } else {
-      k = ( i % 2 == 0) ? 0 : 1;
+      k = ( l % 2 == 0) ? 0 : 1;
     }
 
     for( j = k ; j < world_size; j = j + 2) {
