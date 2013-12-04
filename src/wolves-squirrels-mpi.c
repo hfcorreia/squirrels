@@ -25,7 +25,7 @@
 #define CONFLICT_SIZE 4
 #define CONFLICT_MSG 5
 
-#define BUFFER 1000
+#define BUFFER 100000
 
 typedef struct world_cell {
   int type;
@@ -56,6 +56,7 @@ int squirrel_breeding;
 int wolf_starvation;
 int num_processes;
 
+// Movements_arrays are cleaned
 void clear_ghost_line() {
   free(top_ghost_line);
   free(bottom_ghost_line);
@@ -63,6 +64,7 @@ void clear_ghost_line() {
   bottom_ghost_line = (char*) malloc(1); *bottom_ghost_line = '\0';
   top_ghost_line = (char*) malloc(1); *top_ghost_line = '\0';
 }
+
 
 void print_world(int pid, char* print) { 
   int i, j, size;
@@ -200,6 +202,7 @@ int is_free_position(int x, int y, int type){
   }
 }
 
+
 int* find_free_positions(int pid, position* actual) {
   int *array = (int*) calloc(4, sizeof(int));
   int x = actual->x, y = actual->y, type = actual->cell->type;
@@ -210,7 +213,7 @@ int* find_free_positions(int pid, position* actual) {
   } else {
     size = chunk_size + 2;
   }
-    
+
 
   array[UP] = x - 1 >= 0 && is_free_position(x-1, y, type);
   array[RIGHT] = y + 1 < world_size && is_free_position(x, y+1, type);
@@ -239,6 +242,7 @@ int* find_squirrels(int pid, position *actual) {
   return array;
 }
 
+// calcs where can i(s/w)  move to
 int count_free_positions(int* free_positions) {
   int i, counter = 0;
 
@@ -248,6 +252,7 @@ int count_free_positions(int* free_positions) {
 
   return counter;
 }
+
 
 int calculate_direction(int *possible_positions, int next){
   int direction;
@@ -302,6 +307,7 @@ int find_next_positon(int pid, position *actual) {
   return direction;
 }
 
+// Wolf is moving; what is on next-position?
 void wolf(position* actual, position* next) {
   int x = next->x, y = next->y;
 
@@ -334,6 +340,7 @@ void wolf(position* actual, position* next) {
   world_indexer[x][y].type = WOLF;
 }
 
+// Squirrel is moving; what is on next-position?
 void squirrel(position* actual, position* next) {
   int x = next->x, y = next->y;
   int type = world_indexer[x][y].type;
@@ -369,6 +376,7 @@ void squirrel(position* actual, position* next) {
   }
 }
 
+// Animal moves to next
 void normal_move(position* actual, position* next) {
   int actual_type = actual->cell->type;
 
@@ -385,6 +393,8 @@ void normal_move(position* actual, position* next) {
   }
 }
 
+
+// Wolf dies
 void die(position* actual) {
   int x = actual->x, y = actual->y;
 
@@ -394,9 +404,11 @@ void die(position* actual) {
   world_indexer[x][y].is_breeding = 0;
 }
 
+
 void breed(position *actual) {
   int x = actual->x, y = actual->y;
   if( actual->cell->is_breeding ) {
+    //printf("ANIMAL %d IS BREEDING AT X %d Y %d\n", world_indexer[x][y].type, x, y);
     if( actual->cell->type == WOLF ) {
       world_indexer[x][y].starvation = wolf_starvation;
       world_indexer[x][y].breeding = wolf_breeding;
@@ -406,11 +418,15 @@ void breed(position *actual) {
   }
 }
 
+// When animal breeds: updates flags actual + moves to next
 void breed_move(position* actual, position* next) {
   breed(actual);
+  //printf("ANIMAL %d IS MOVING TO NextX %d NextY %d\n", world_indexer[actual->x][actual->y].type, next->x, next->y);
+  //printf("BOTTOM GHOST %s\n", bottom_ghost_line);
   normal_move(actual, next);
 }
 
+// i moved, clear old position
 void clear(position* actual) {
   int x = actual->x, y = actual->y, type = actual->cell->type;
 
@@ -420,6 +436,7 @@ void clear(position* actual) {
   world_indexer[x][y].is_breeding = 0;
 }
 
+// MOVE ANIMAL 
 void move_element(position* actual, position* next) {
   if( actual->cell->is_breeding ) {
     breed_move(actual, next);
@@ -429,6 +446,8 @@ void move_element(position* actual, position* next) {
   }
 }
 
+
+// ---- GO DIRECTION ---- //
 void go_up(position *actual) {
   position* next = (position*) calloc( 1, sizeof(position) );
 
@@ -472,15 +491,29 @@ void go_left(position *actual) {
   move_element( actual, next);
   free(next);
 }
+// ---------------------//
+
 
 void add_tmp_line(int pid, position *position, int direction){
   char buffer[BUFFER];
   int x = position->x;
   int y = position->y;
   int type = position->cell->type;
-  int breed = position->cell->breeding;
-  int starvation = position->cell->starvation;
   int is_breeding = position->cell->is_breeding;
+  int breed, starvation;
+  if(is_breeding == 1) {
+    if(type == WOLF) {
+      breed = wolf_breeding;
+      starvation = wolf_starvation;
+    } else if(type == SQUIRREL || type == SQUIRREL_TREE) {
+      breed = squirrel_breeding;
+      starvation = 0;
+    }
+    is_breeding = 0;
+  } else {
+    breed = position->cell->breeding;
+    starvation = position->cell->starvation; 
+  }
 
   x = ( UP  == direction) ? x - 1 : x + 1;
 
@@ -558,6 +591,7 @@ void go(int pid, position *actual) {
   }
 }
 
+// Let the process begin
 void exodus(int pid, int x, int y) {
   position* actual = (position*) calloc( 1, sizeof(position) );
   actual->x = x;
@@ -581,6 +615,7 @@ void exodus(int pid, int x, int y) {
 
   free(actual);
 }
+
 
 void sub_generation(int is_black_gen, int pid){
   int i, j, l, size;
@@ -617,6 +652,8 @@ void sub_generation(int is_black_gen, int pid){
   }
 }
 
+
+// Updates animals' flags each generation
 void update_generation() {
   int i, j;
 
@@ -633,6 +670,7 @@ void update_generation() {
     }
   }
 }
+
 
 void duplicate(int pid) {
   int size = 0;
@@ -657,9 +695,11 @@ char* send_input(FILE* fp, int num_processes) {
   char *world_size_c = (char*) malloc(strlen(buffer)+1);
 
   // read world size
+  printf("READ WORLD SIZE PID %d\n", 0);
   fgets(buffer, BUFFER, fp);
   memcpy(sendBuffer, buffer, strlen(buffer)+1);
   memcpy(world_size_c, buffer, strlen(buffer)+1);
+  printf("AFTER MEMCOPY %d\n", 0);
 
   // calculate chunk size
   world_size = atoi(buffer);
@@ -672,6 +712,7 @@ char* send_input(FILE* fp, int num_processes) {
   *tmp_line_before = '\0';
 
   for( pid = 1 ; pid < num_processes + 1; pid++){
+    printf("PROCESSING %d\n", pid);
     while( fgets(buffer, BUFFER, fp) != NULL) {
       char *save;
       char *token = strtok_r(buffer, " ", &save);
@@ -684,6 +725,7 @@ char* send_input(FILE* fp, int num_processes) {
         strcat(result, token);
         strcat(result, " ");
         strcat(result, save);
+
 
         if( x == offset ) {
           char *new_tmp_line_after = (char*) malloc( strlen(tmp_line_after) + strlen(token) + strlen(save) + 2 );
@@ -714,14 +756,17 @@ char* send_input(FILE* fp, int num_processes) {
         free(tmp);
       } 
       else {
+        printf("SENDING TO %d\n", pid);
         if(pid != num_processes) {
           int length = strlen(sendBuffer) + 1;
           MPI_Send(&length, 1, MPI_INT, pid, CHUNK_SIZE, MPI_COMM_WORLD);
           MPI_Send(sendBuffer, length, MPI_CHAR, pid, CHUNK_MSG, MPI_COMM_WORLD);
           offset += chunk_size;
+          printf("going to free\n");
           free(sendBuffer);
+          printf("bum going to free\n");
 
-          sendBuffer = (char*) malloc(strlen(world_size_c)+strlen(tmp_line_before)+strlen(tmp_line_after)+2);
+          sendBuffer = (char*) malloc(strlen(save) + strlen(world_size_c)+strlen(tmp_line_before)+strlen(tmp_line_after)+2);
           strcpy(sendBuffer, world_size_c);
           strcat(sendBuffer, tmp_line_before);
           strcat(sendBuffer, tmp_line_after);
@@ -747,6 +792,7 @@ char* send_input(FILE* fp, int num_processes) {
   return sendBuffer;
 }
 
+// Each process waits for its input
 char* receive_input() {
   MPI_Status status[2];
   int length;
@@ -757,6 +803,8 @@ char* receive_input() {
   return receive_buffer;
 }
 
+
+// 
 char* get_movements(int chunk, int start, int end){
   int i, j;
   char* movements = (char*) malloc(1); 
@@ -767,6 +815,7 @@ char* get_movements(int chunk, int start, int end){
       int x =  i + ((chunk - 1) * chunk_size);
       if( chunk != 1 ) x--;
       int type = world_indexer[i][j].type;
+      int starv = world_indexer[i][j].starvation;
       char sym;
       char* move;
 
@@ -801,6 +850,7 @@ char* get_movements(int chunk, int start, int end){
       char* aux = movements;
       movements = tmp_movements;
       free(aux);
+      free(move);
     }
   }
 
@@ -1122,7 +1172,7 @@ int main(int argc, char *argv[]) {
   wolf_starvation = atoi(argv[4]);
   int num_generation = atoi(argv[5]);
 
-  // only the master reads input
+  //only the master reads input
   char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r"), num_processes) : receive_input();
 
   genesis(input, pid, num_processes);
@@ -1135,7 +1185,7 @@ int main(int argc, char *argv[]) {
 
     clear_ghost_line();
 
- //   print_world(pid, "AFTER RED GEN");
+    //print_world(pid, "AFTER RED GEN");
     duplicate(pid);
 
     sub_generation(BLK_GEN, pid);
@@ -1147,7 +1197,7 @@ int main(int argc, char *argv[]) {
 
     duplicate(pid);
 
-//    print_world(pid, "AFTER BLACK GEN");
+    //print_world(pid, "AFTER BLACK GEN");
   }
 
   if ( pid == 0 ) {
