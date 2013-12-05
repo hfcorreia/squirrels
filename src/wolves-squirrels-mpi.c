@@ -301,8 +301,6 @@ int find_next_positon(int pid, position *actual) {
   int free_counter = count_free_positions(free_positions);
   int squirrel_counter = count_free_positions(free_squirrels);
   int direction = -1;
-  if ( pid == 0 ) 
-    printf("PID: %d x: %d y: %d, C: %d, COUNTER: %d\n", pid , actual->x, actual->y, c, free_counter);
 
   if( actual->cell->type == WOLF &&  squirrel_counter > 0) {
     int next = c % squirrel_counter;
@@ -548,7 +546,7 @@ void add_tmp_line(int pid, position *position, int direction){
     char *aux = top_ghost_line;
     top_ghost_line = tmp;
     free(aux);
-  } else if ( pid != 0 && pid != 1 && x == chunk_size ) {
+  } else if ( pid != 0 && pid != 1 && x == chunk_size + 1) {
     // add to bottom ghost of 2
     sprintf(buffer, "%d %d %d %d %d %d\n", x, y, type, breed, starvation, is_breeding);
     char *tmp = malloc( strlen(buffer) + strlen(bottom_ghost_line) + 1);
@@ -656,7 +654,7 @@ void update_generation(int pid) {
 
   if( pid == 0 ) {
     i = 1;
-    size = chunk_size + 1;
+    size = world_size - ( num_processes  - 1 ) * chunk_size + 1;
   } else if ( pid == 1 ) {
     i = 0;
     size = chunk_size + 1;
@@ -683,7 +681,9 @@ void update_generation(int pid) {
 void duplicate(int pid) {
   int size = 0;
 
-  if( pid == 0 || pid == 1 ) {
+  if( pid == 0 ) {
+    size = world_size - (num_processes - 1 ) * chunk_size + 1;
+  } else if( pid == 1 ) {
     size = chunk_size + 1;
   } else {
     size = chunk_size + 2;
@@ -715,9 +715,10 @@ char* send_input(FILE* fp) {
   char* after_line = (char*) malloc(1); *after_line = '\0';
   char* before_line = (char*) malloc(1); *before_line = '\0';
 
+  char* save;
+  char* token;
   while( fgets(buffer, BUFFER, fp) != NULL ) {
-    char *save; 
-    char *token = strtok_r(buffer, " ", &save);
+    token = strtok_r(buffer, " ", &save);
     int x = atoi(token);
 
     // add after line
@@ -832,6 +833,46 @@ char* send_input(FILE* fp) {
         pid++;
       } else {
         offset = world_size - 1;
+        // BY LOKI, yes he is a traitor
+        if( x == offset ) {
+          char *tmp = (char*) malloc ( strlen(after_line) + strlen(token) + strlen(save) + 2);
+
+          strcpy( tmp, after_line);
+          strcat( tmp, token);
+          strcat( tmp, " ");
+          strcat( tmp, save);
+
+          char* aux = after_line;
+          after_line = tmp;
+          free(aux);
+        } 
+        // add before line
+        else if ( x == offset -1 ) {
+          char *tmp = (char*) malloc ( strlen(before_line) + strlen(token) + strlen(save) + 2);
+
+          strcpy( tmp, before_line);
+          strcat( tmp, token);
+          strcat( tmp, " ");
+          strcat( tmp, save);
+
+          char* aux = before_line;
+          before_line = tmp;
+          free(aux);
+
+        } 
+        // add to send buffer
+        else if ( x < offset ) {
+
+          char *tmp = (char*) malloc ( strlen(sendBuffer) + strlen(token) + strlen(save) + 2);
+          strcpy( tmp, sendBuffer);
+          strcat( tmp, token);
+          strcat( tmp, " ");
+          strcat( tmp, save);
+
+          char* aux = sendBuffer;
+          sendBuffer = tmp;
+          free(aux);
+        }
       }
     }
   }
@@ -917,11 +958,11 @@ char* get_movements(int chunk, int start, int end){
 char* end_result(int pid) {
   if( pid == 0 ) {
     int end_size = world_size - (num_processes- 1) * chunk_size;
-    return get_movements( num_processes, 2, end_size + 1);
+    return get_movements( num_processes, 1, end_size + 1);
   } else if( pid == 1 ) {
-    return get_movements( pid, 0, chunk_size + 1);
+    return get_movements( pid, 0, chunk_size);
   } else {
-    return get_movements( pid, 2, chunk_size + 2);
+    return get_movements( pid, 1, chunk_size + 1);
   }
 }
 
@@ -1146,12 +1187,12 @@ void apply_received(int pid, char* received, int process_top) {
     substitute(pid , line, 0);
     apply_conflicts(pid, top_ghost_line, 0);
   } else if ( pid == 1 ) {
-      apply_conflicts(pid, movement_array, chunk_size - 1);
-      substitute(pid , line, chunk_size);
-      apply_conflicts(pid, bottom_ghost_line, chunk_size);
+    apply_conflicts(pid, movement_array, chunk_size - 1);
+    substitute(pid , line, chunk_size);
+    apply_conflicts(pid, bottom_ghost_line, chunk_size);
   } else {
     if(process_top) {
-      apply_conflicts(pid, movement_array, 1);
+     apply_conflicts(pid, movement_array, 1);
       substitute(pid , line, 0);
       apply_conflicts(pid, top_ghost_line, 0);
     } else {
@@ -1181,7 +1222,7 @@ char* receive_conflicts( int from_pid ) {
   return receive_buffer;
 }
 
-void resolve_conflicts(int pid) {
+void resolve_conflicts(int pid, char* color) {
   char* line, *received, *send;
 
   if( pid == 0 ) {
@@ -1193,8 +1234,10 @@ void resolve_conflicts(int pid) {
     strcat( send, "|");
     strcat( send, line);
 
+    //printf("%s PID %d SENDING to %d\n%s\n", color ,pid, num_processes -1, send);
     send_conflicts( send, num_processes - 1);
     received = receive_conflicts( num_processes - 1 );
+    //printf("%s PID %d RECEIVING FROM %d\n%s\n", color,pid, num_processes -1, received);
 
     apply_received(pid, received, 0);
   } else if( pid == 1 ) {
@@ -1205,8 +1248,10 @@ void resolve_conflicts(int pid) {
     strcat( send, "|");
     strcat( send, line);
 
+    ////printf("%s PID %d SENDING to %d\n%s\n", color, pid, (pid+1) % num_processes, send );
     send_conflicts( send, (pid + 1) % num_processes );
     received = receive_conflicts( (pid + 1) % num_processes );
+    //printf("%s PID %d RECEIVING FROM %d\n%s\n", color, pid, (pid + 1) % num_processes, received);
 
     apply_received(pid, received, 0);
   } else {
@@ -1218,9 +1263,12 @@ void resolve_conflicts(int pid) {
     strcat( send, "|");
     strcat( send, line);
 
+    //printf("PID %d SENDING\n%s\n", pid, send);
     send_conflicts( send, pid - 1);
+    //printf("%s PID %d SENDING to %d\n%s\n", color ,pid, pid -1, send);
     received = receive_conflicts( pid - 1 );
 
+    //printf("%s PID %d RECEIVING FROM %d\n%s\n", color,pid, pid -1, received);
     apply_received(pid, received, 1);
 
     // send the bottom
@@ -1232,7 +1280,9 @@ void resolve_conflicts(int pid) {
     strcat( send, line);
 
     send_conflicts( send, (pid + 1) % num_processes );
+    //printf("%s PID %d SENDING to %d\n%s\n", color, pid, (pid+1) % num_processes, send );
     received = receive_conflicts( (pid + 1) % num_processes );
+    //printf("%s PID %d RECEIVING FROM %d\n%s\n", color, pid, (pid + 1) % num_processes, received);
 
     apply_received(pid, received, 0);
   }
@@ -1261,21 +1311,21 @@ int main(int argc, char *argv[]) {
 
   //only the master reads input
   char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r")) : receive_input();
-//  printf("INPUT AT %d\n%s\n", pid, input);
+//  if(pid == 0) printf("INPUT AT 0\n%s\n", input);
   genesis(input, pid, num_processes);
-//print_world(pid, "ORIGIANAL");
+  //print_world(pid, "ORIGIANAL");
 
   for( i = 0; i < num_generation; i++) {
     sub_generation(RED_GEN, pid);
-    resolve_conflicts(pid);
+    resolve_conflicts(pid, "RED");
     MPI_Barrier(MPI_COMM_WORLD);
 
-    print_world(pid, "AFTER RED GEN");
+    //print_world(pid, "AFTER RED GEN");
     clear_ghost_line();
     duplicate(pid);
 
     sub_generation(BLK_GEN, pid);
-    resolve_conflicts(pid);
+    resolve_conflicts(pid, "BLACK");
     MPI_Barrier(MPI_COMM_WORLD);
     clear_ghost_line();
 
@@ -1283,8 +1333,10 @@ int main(int argc, char *argv[]) {
 
     duplicate(pid);
 
-    //print_world(pid, "AFTER BLACK GEN");
+ //print_world(pid, "AFTER BLACK GEN");
   }
+
+ //print_world(pid, "END");
 
   if ( pid == 0 ) {
     char* receive_all = final_receive();

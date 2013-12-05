@@ -104,37 +104,6 @@ void print_world(void) {
         }
         printf("|\n");
     }
-    printf("READ\n");
-    for(i = -1; i < world_size; i++) {
-        for(j = 0; j < world_size; j++) {
-            if( i == -1) {
-                printf("|%d", j % 10);
-            } else {
-                printf("%c", '|');
-                switch(world_indexer_read[i][j].type) {
-                    case SQUIRREL:
-                        printf("%c", 's');
-                        break;
-                    case WOLF:
-                        printf("%c", 'w');
-                        break;
-                    case TREE:
-                        printf("%c", 't');
-                        break;
-                    case ICE:
-                        printf("%c", 'i');
-                        break;
-                    case SQUIRREL_TREE:
-                        printf("%c", '$');
-                        break;
-                    default:
-                        printf("%c", ' ');
-                        break;
-                }
-            }
-        }
-        printf("|\n");
-    }
 }
 
 /** Allocates space for the world. */
@@ -567,21 +536,21 @@ int main(int argc, char *argv[]) {
 
     start_t = clock();
 
-    //printf("ORIGINAL WORLD\n");
-//    print_world();
+//    printf("ORIGINAL WORLD\n");
+ //   print_world();
     // process generations
     for( i = 0; i < num_generation; i++) {
-     //   printf("========== GEN %d ===== \n", i);
+     //printf("========== GEN %d ===== \n", i);
         sub_generation(RED_GEN);
 
-      //  printf("AFTER RED WORLD\n");
-//        print_world();
+  //      printf("AFTER RED WORLD\n");
+   //     print_world();
 
         duplicate();
         sub_generation(BLK_GEN);
 
-       // printf("\nAFTER BLACK WORLD\n");
-//        print_world();
+     //   printf("AFTER BLACK WORLD\n");
+    //    print_world();
 
         update_generation();
     }
