@@ -69,7 +69,9 @@ void clear_ghost_line() {
 void print_world(int pid, char* print) { 
   int i, j, size;
 
-  if(pid == 0 || pid == 1 ) 
+  if ( pid == 0 ) 
+    size = world_size - (num_processes - 1 ) * chunk_size + 1;
+  else if( pid == 1 ) 
     size = chunk_size + 1;
   else 
     size = chunk_size + 2;
@@ -109,6 +111,7 @@ void print_world(int pid, char* print) {
     }
     printf("|\n");
   }
+  printf("\n\n\n\n");
 }
 
 /** Allocates space for the world. */
@@ -134,6 +137,7 @@ void genesis(char *input, int pid, int num_processes) {
   char* save;
   char* token = strtok_r(input, "\n", &save);
   int chunk;
+
 
   world_size = atoi(token);
   chunk_size = world_size / num_processes;
@@ -208,7 +212,9 @@ int* find_free_positions(int pid, position* actual) {
   int x = actual->x, y = actual->y, type = actual->cell->type;
   int size;
 
-  if ( pid == 0 || pid == 1 ) {
+  if ( pid == 0  ) {
+    size = world_size - ( num_processes - 1 ) * chunk_size + 1;
+  } else  if (  pid == 1 ) {
     size = chunk_size + 1;
   } else {
     size = chunk_size + 2;
@@ -228,7 +234,9 @@ int* find_squirrels(int pid, position *actual) {
   int x = actual->x, y = actual->y;
   int size;
 
-  if ( pid == 0 || pid == 1 ) {
+  if ( pid == 0  ) {
+    size = world_size - ( num_processes - 1 ) * chunk_size + 1;
+  } else  if (  pid == 1 ) {
     size = chunk_size + 1;
   } else {
     size = chunk_size + 2;
@@ -289,9 +297,12 @@ int find_next_positon(int pid, position *actual) {
     c = actual->x * world_size + actual->y;
   }
 
+  
   int free_counter = count_free_positions(free_positions);
   int squirrel_counter = count_free_positions(free_squirrels);
   int direction = -1;
+  if ( pid == 0 ) 
+    printf("PID: %d x: %d y: %d, C: %d, COUNTER: %d\n", pid , actual->x, actual->y, c, free_counter);
 
   if( actual->cell->type == WOLF &&  squirrel_counter > 0) {
     int next = c % squirrel_counter;
@@ -408,7 +419,6 @@ void die(position* actual) {
 void breed(position *actual) {
   int x = actual->x, y = actual->y;
   if( actual->cell->is_breeding ) {
-    //printf("ANIMAL %d IS BREEDING AT X %d Y %d\n", world_indexer[x][y].type, x, y);
     if( actual->cell->type == WOLF ) {
       world_indexer[x][y].starvation = wolf_starvation;
       world_indexer[x][y].breeding = wolf_breeding;
@@ -421,8 +431,6 @@ void breed(position *actual) {
 // When animal breeds: updates flags actual + moves to next
 void breed_move(position* actual, position* next) {
   breed(actual);
-  //printf("ANIMAL %d IS MOVING TO NextX %d NextY %d\n", world_indexer[actual->x][actual->y].type, next->x, next->y);
-  //printf("BOTTOM GHOST %s\n", bottom_ghost_line);
   normal_move(actual, next);
 }
 
@@ -498,24 +506,13 @@ void add_tmp_line(int pid, position *position, int direction){
   char buffer[BUFFER];
   int x = position->x;
   int y = position->y;
-  int type = position->cell->type;
-  int is_breeding = position->cell->is_breeding;
-  int breed, starvation;
-  if(is_breeding == 1) {
-    if(type == WOLF) {
-      breed = wolf_breeding;
-      starvation = wolf_starvation;
-    } else if(type == SQUIRREL || type == SQUIRREL_TREE) {
-      breed = squirrel_breeding;
-      starvation = 0;
-    }
-    is_breeding = 0;
-  } else {
-    breed = position->cell->breeding;
-    starvation = position->cell->starvation; 
-  }
+  int breed, starvation, is_breeding, type;
 
   x = ( UP  == direction) ? x - 1 : x + 1;
+  breed = world_indexer[x][y].breeding;
+  starvation = world_indexer[x][y].starvation;
+  is_breeding = world_indexer[x][y].breeding;
+  type = world_indexer[x][y].type;
 
   if( pid == 1 && x == chunk_size ) {
     // add to tmp ghost bottom
@@ -571,15 +568,15 @@ void go(int pid, position *actual) {
 
   switch(next) {
     case UP:
-      add_tmp_line(pid, actual, UP);
       go_up( actual );
+      add_tmp_line(pid, actual, UP);
       break;
     case RIGHT:
       go_right( actual );
       break;
     case DOWN:
-      add_tmp_line(pid, actual, DOWN);
       go_down( actual );
+      add_tmp_line(pid, actual, DOWN);
       break;
     case LEFT:
       go_left( actual );
@@ -633,8 +630,8 @@ void sub_generation(int is_black_gen, int pid){
     size = chunk_size;
   } else {
     i = 1;
-    size = chunk_size + 2;
-    l =  chunk_size * ( num_processes - 1 );
+    size = chunk_size + 1;
+    l =  chunk_size * ( pid - 1 );
   }
 
   for( ; i < size; i++, l++) {
@@ -654,10 +651,21 @@ void sub_generation(int is_black_gen, int pid){
 
 
 // Updates animals' flags each generation
-void update_generation() {
-  int i, j;
+void update_generation(int pid) {
+  int i, j, size;
 
-  for( i = 0 ; i < chunk_size ; i++ ) {
+  if( pid == 0 ) {
+    i = 1;
+    size = chunk_size + 1;
+  } else if ( pid == 1 ) {
+    i = 0;
+    size = chunk_size + 1;
+  } else {
+    i = 1;
+    size = chunk_size + 2;
+  }
+
+  for( ; i < size ; i++ ) {
     for( j = 0 ; j < world_size ; j++ ) {
       int type = world_indexer[i][j].type;
 
@@ -674,6 +682,7 @@ void update_generation() {
 
 void duplicate(int pid) {
   int size = 0;
+
   if( pid == 0 || pid == 1 ) {
     size = chunk_size + 1;
   } else {
@@ -689,107 +698,155 @@ void duplicate(int pid) {
 
 
 /* Sends from process 0 to all other nodes the input */
-char* send_input(FILE* fp, int num_processes) {
+char* send_input(FILE* fp) {
   char buffer[BUFFER];
   char *sendBuffer = (char*) malloc(strlen(buffer)+1);
   char *world_size_c = (char*) malloc(strlen(buffer)+1);
 
-  // read world size
-  printf("READ WORLD SIZE PID %d\n", 0);
   fgets(buffer, BUFFER, fp);
   memcpy(sendBuffer, buffer, strlen(buffer)+1);
   memcpy(world_size_c, buffer, strlen(buffer)+1);
-  printf("AFTER MEMCOPY %d\n", 0);
 
   // calculate chunk size
   world_size = atoi(buffer);
   chunk_size = world_size / num_processes;
-  int offset = chunk_size, pid;
+  int offset = chunk_size, pid = 1;
 
-  char* tmp_line_after = (char*) malloc(1);
-  char* tmp_line_before = (char*) malloc(1);
-  *tmp_line_after = '\0';
-  *tmp_line_before = '\0';
+  char* after_line = (char*) malloc(1); *after_line = '\0';
+  char* before_line = (char*) malloc(1); *before_line = '\0';
 
-  for( pid = 1 ; pid < num_processes + 1; pid++){
-    printf("PROCESSING %d\n", pid);
-    while( fgets(buffer, BUFFER, fp) != NULL) {
-      char *save;
-      char *token = strtok_r(buffer, " ", &save);
-      int x = atoi(token);
+  while( fgets(buffer, BUFFER, fp) != NULL ) {
+    char *save; 
+    char *token = strtok_r(buffer, " ", &save);
+    int x = atoi(token);
 
-      if( x <= offset ) {
-        char *result = (char*) malloc( strlen(sendBuffer) + strlen(token) + strlen(save) + 2);
+    // add after line
+    if( x == offset ) {
+      char *tmp = (char*) malloc ( strlen(after_line) + strlen(token) + strlen(save) + 2);
 
-        strcpy(result, sendBuffer);
-        strcat(result, token);
-        strcat(result, " ");
-        strcat(result, save);
+      strcpy( tmp, after_line);
+      strcat( tmp, token);
+      strcat( tmp, " ");
+      strcat( tmp, save);
+
+      char* aux = after_line;
+      after_line = tmp;
+      free(aux);
+    } 
+    // add before line
+    else if ( x == offset -1 ) {
+      char *tmp = (char*) malloc ( strlen(before_line) + strlen(token) + strlen(save) + 2);
+
+      strcpy( tmp, before_line);
+      strcat( tmp, token);
+      strcat( tmp, " ");
+      strcat( tmp, save);
+
+      char* aux = before_line;
+      before_line = tmp;
+      free(aux);
+
+    } 
+    // add to send buffer
+    else if ( x < offset ) {
+
+      char *tmp = (char*) malloc ( strlen(sendBuffer) + strlen(token) + strlen(save) + 2);
+      strcpy( tmp, sendBuffer);
+      strcat( tmp, token);
+      strcat( tmp, " ");
+      strcat( tmp, save);
+
+      char* aux = sendBuffer;
+      sendBuffer = tmp;
+      free(aux);
+    } 
+    // after offset !beware!
+    else {
+      // send to pid except to master
+      if( num_processes != pid ) {
+        char *send = (char*) malloc ( strlen(sendBuffer) + strlen(before_line) + strlen(after_line) + 1);
+        strcpy(send, sendBuffer);
+        strcat(send, before_line);
+        strcat(send, after_line);
+
+        int length = strlen(send) + 1;
+        MPI_Send(&length, 1, MPI_INT, pid, CHUNK_SIZE, MPI_COMM_WORLD);
+        MPI_Send(send, length, MPI_CHAR, pid, CHUNK_MSG, MPI_COMM_WORLD);
+        offset += chunk_size;
+
+        free(sendBuffer);
+        free(send);
+
+        // recover read token 
+        sendBuffer = (char*) malloc ( strlen(before_line) + strlen(after_line) + strlen(token) + strlen(save) +  2);
+        strcpy(sendBuffer, world_size_c);
+        strcat(sendBuffer, before_line);
+        strcat(sendBuffer, after_line);
+
+        free(before_line); free(after_line);
+        before_line = (char*) malloc (1); *before_line = '\0';
+        after_line = (char*) malloc (1); *after_line = '\0';
 
 
+        // BY THOR, yes he was here with his hammer(code) to save the day
         if( x == offset ) {
-          char *new_tmp_line_after = (char*) malloc( strlen(tmp_line_after) + strlen(token) + strlen(save) + 2 );
+          char *tmp = (char*) malloc ( strlen(after_line) + strlen(token) + strlen(save) + 2);
 
-          strcpy(new_tmp_line_after, tmp_line_after);
-          strcat(new_tmp_line_after, token);
-          strcat(new_tmp_line_after, " ");
-          strcat(new_tmp_line_after, save);
+          strcpy( tmp, after_line);
+          strcat( tmp, token);
+          strcat( tmp, " ");
+          strcat( tmp, save);
 
-          char* tmp = tmp_line_after;
-          tmp_line_after = new_tmp_line_after;
-          free(tmp);
+          char* aux = after_line;
+          after_line = tmp;
+          free(aux);
+        } 
+        // add before line
+        else if ( x == offset -1 ) {
+          char *tmp = (char*) malloc ( strlen(before_line) + strlen(token) + strlen(save) + 2);
+
+          strcpy( tmp, before_line);
+          strcat( tmp, token);
+          strcat( tmp, " ");
+          strcat( tmp, save);
+
+          char* aux = before_line;
+          before_line = tmp;
+          free(aux);
+
+        } 
+        // add to send buffer
+        else if ( x < offset ) {
+
+          char *tmp = (char*) malloc ( strlen(sendBuffer) + strlen(token) + strlen(save) + 2);
+          strcpy( tmp, sendBuffer);
+          strcat( tmp, token);
+          strcat( tmp, " ");
+          strcat( tmp, save);
+
+          char* aux = sendBuffer;
+          sendBuffer = tmp;
+          free(aux);
         }
-        if( x == offset - 1 ) {
-          char *new_tmp_line_before = (char*) malloc( strlen(tmp_line_before) + strlen(token) + strlen(save) + 2 );
-          strcpy(new_tmp_line_before, tmp_line_before);
-          strcat(new_tmp_line_before, token);
-          strcat(new_tmp_line_before, " ");
-          strcat(new_tmp_line_before, save);
 
-          char* tmp = tmp_line_before;
-          tmp_line_before = new_tmp_line_before;
-          free(tmp);
-        }
-
-        char* tmp = sendBuffer;
-        sendBuffer = result;
-        free(tmp);
-      } 
-      else {
-        printf("SENDING TO %d\n", pid);
-        if(pid != num_processes) {
-          int length = strlen(sendBuffer) + 1;
-          MPI_Send(&length, 1, MPI_INT, pid, CHUNK_SIZE, MPI_COMM_WORLD);
-          MPI_Send(sendBuffer, length, MPI_CHAR, pid, CHUNK_MSG, MPI_COMM_WORLD);
-          offset += chunk_size;
-          printf("going to free\n");
-          free(sendBuffer);
-          printf("bum going to free\n");
-
-          sendBuffer = (char*) malloc(strlen(save) + strlen(world_size_c)+strlen(tmp_line_before)+strlen(tmp_line_after)+2);
-          strcpy(sendBuffer, world_size_c);
-          strcat(sendBuffer, tmp_line_before);
-          strcat(sendBuffer, tmp_line_after);
-          strcat(sendBuffer, token);
-          strcat(sendBuffer, " ");
-          strcat(sendBuffer, save);
-
-          free(tmp_line_after);
-          free(tmp_line_before);
-          tmp_line_before = (char*) malloc(1);
-          *tmp_line_before = '\0';
-          tmp_line_after = (char*) malloc(1);
-          *tmp_line_after = '\0';
-        }
-        if( pid == num_processes - 1 ) offset = world_size + 1;
-        break;
+        pid++;
+      } else {
+        offset = world_size - 1;
       }
     }
   }
 
-  fclose(fp);
+  char *end_result = (char*) malloc( strlen(before_line) + strlen(after_line) + strlen(sendBuffer) + 1 );
 
-  return sendBuffer;
+  strcpy(end_result, sendBuffer);
+  strcat(end_result, before_line);
+  strcat(end_result, after_line);
+  free(sendBuffer);
+  free(before_line);
+  free(after_line);
+
+  fclose(fp);
+  return end_result;
 }
 
 // Each process waits for its input
@@ -800,22 +857,22 @@ char* receive_input() {
   MPI_Recv(&length, 1, MPI_INT, 0, CHUNK_SIZE, MPI_COMM_WORLD, &status[0]);
   receive_buffer = (char *) malloc(length);
   MPI_Recv(receive_buffer, length, MPI_CHAR, 0, CHUNK_MSG, MPI_COMM_WORLD, &status[1]);
+
   return receive_buffer;
 }
 
 
 // 
 char* get_movements(int chunk, int start, int end){
-  int i, j;
+  int i, j, size;
   char* movements = (char*) malloc(1); 
   *movements = '\0';
 
   for( i = start ;  i < end; i++) {
     for( j = 0 ;  j < world_size ; j++) {
-      int x =  i + ((chunk - 1) * chunk_size);
-      if( chunk != 1 ) x--;
+      int x =  i + (chunk - 1) * (chunk_size)  - 1;
+      if( chunk == 1 ) x = i;
       int type = world_indexer[i][j].type;
-      int starv = world_indexer[i][j].starvation;
       char sym;
       char* move;
 
@@ -854,7 +911,6 @@ char* get_movements(int chunk, int start, int end){
     }
   }
 
-  //printf("\n\nMOVEMENTS at pid %d, %s\n\n", chunk, movements);
   return  movements;
 }
 
@@ -865,7 +921,7 @@ char* end_result(int pid) {
   } else if( pid == 1 ) {
     return get_movements( pid, 0, chunk_size + 1);
   } else {
-    return get_movements( pid, 2, chunk_size + 1);
+    return get_movements( pid, 2, chunk_size + 2);
   }
 }
 
@@ -1074,7 +1130,7 @@ void substitute(int pid, char* line, int line_number) {
 
 }
 
-void apply_received(int pid, char* received) {
+void apply_received(int pid, char* received, int process_top) {
   char *line, *movement_array = NULL;
   if( *received == '|' ) { 
     char *save;
@@ -1085,21 +1141,27 @@ void apply_received(int pid, char* received) {
     movement_array = strtok_r(received, "|", &line);
   }
 
-  // merge movement_array with line
-  if( pid == 0 ) {
+  if( pid == 0) {
     apply_conflicts(pid, movement_array, 1);
     substitute(pid , line, 0);
     apply_conflicts(pid, top_ghost_line, 0);
-
-  } else if( pid == 1 ) {
-    apply_conflicts(pid, movement_array, chunk_size - 1);
-    substitute(pid , line, chunk_size);
-    apply_conflicts(pid, bottom_ghost_line, chunk_size);
-
+  } else if ( pid == 1 ) {
+      apply_conflicts(pid, movement_array, chunk_size - 1);
+      substitute(pid , line, chunk_size);
+      apply_conflicts(pid, bottom_ghost_line, chunk_size);
   } else {
-
+    if(process_top) {
+      apply_conflicts(pid, movement_array, 1);
+      substitute(pid , line, 0);
+      apply_conflicts(pid, top_ghost_line, 0);
+    } else {
+      apply_conflicts(pid, movement_array, chunk_size);
+      substitute(pid , line, chunk_size + 1);
+      apply_conflicts(pid, top_ghost_line, chunk_size + 1);
+    }
   }
 }
+
 
 
 void send_conflicts( char* results, int pid) {
@@ -1134,7 +1196,7 @@ void resolve_conflicts(int pid) {
     send_conflicts( send, num_processes - 1);
     received = receive_conflicts( num_processes - 1 );
 
-    apply_received(pid, received);
+    apply_received(pid, received, 0);
   } else if( pid == 1 ) {
     line = calc_line( chunk_size -1 );
     send = (char*) malloc( strlen(line) + strlen(bottom_ghost_line) + 2 );
@@ -1146,9 +1208,33 @@ void resolve_conflicts(int pid) {
     send_conflicts( send, (pid + 1) % num_processes );
     received = receive_conflicts( (pid + 1) % num_processes );
 
-    apply_received(pid, received);
+    apply_received(pid, received, 0);
   } else {
-    /* TODO: resolve 4 2 critical zones */
+    // send the top
+    line = calc_line( 1 );
+    send = (char*) malloc( strlen(line) + strlen(top_ghost_line) + 2 );
+
+    strcpy( send, top_ghost_line);
+    strcat( send, "|");
+    strcat( send, line);
+
+    send_conflicts( send, pid - 1);
+    received = receive_conflicts( pid - 1 );
+
+    apply_received(pid, received, 1);
+
+    // send the bottom
+    line = calc_line( chunk_size  );
+    send = (char*) malloc( strlen(line) + strlen(bottom_ghost_line) + 2 );
+
+    strcpy( send, bottom_ghost_line);
+    strcat( send, "|");
+    strcat( send, line);
+
+    send_conflicts( send, (pid + 1) % num_processes );
+    received = receive_conflicts( (pid + 1) % num_processes );
+
+    apply_received(pid, received, 0);
   }
 }
 
@@ -1165,7 +1251,8 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank (MPI_COMM_WORLD, &pid);
   MPI_Comm_size (MPI_COMM_WORLD, &num_processes);
 
-  printf("Running wolves at %d of %d\n", pid, num_processes);
+  MPI_Barrier(MPI_COMM_WORLD);
+  double elapsed_time = - MPI_Wtime();
 
   wolf_breeding = atoi(argv[2]);
   squirrel_breeding = atoi(argv[3]);
@@ -1173,19 +1260,18 @@ int main(int argc, char *argv[]) {
   int num_generation = atoi(argv[5]);
 
   //only the master reads input
-  char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r"), num_processes) : receive_input();
-
+  char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r")) : receive_input();
+//  printf("INPUT AT %d\n%s\n", pid, input);
   genesis(input, pid, num_processes);
-  //print_world(pid, "ORIGINAL");
+//print_world(pid, "ORIGIANAL");
 
   for( i = 0; i < num_generation; i++) {
     sub_generation(RED_GEN, pid);
     resolve_conflicts(pid);
     MPI_Barrier(MPI_COMM_WORLD);
 
+    print_world(pid, "AFTER RED GEN");
     clear_ghost_line();
-
-    //print_world(pid, "AFTER RED GEN");
     duplicate(pid);
 
     sub_generation(BLK_GEN, pid);
@@ -1193,7 +1279,7 @@ int main(int argc, char *argv[]) {
     MPI_Barrier(MPI_COMM_WORLD);
     clear_ghost_line();
 
-    update_generation(); 
+    update_generation(pid); 
 
     duplicate(pid);
 
@@ -1209,6 +1295,8 @@ int main(int argc, char *argv[]) {
     strcpy( result, receive_all);
     strcat( result, receive_0);
 
+    elapsed_time += MPI_Wtime();
+    printf("FINAL: %f\n", elapsed_time);
     printf("%s", result);
   } else {
     final_send(pid);
