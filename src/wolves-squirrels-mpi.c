@@ -25,7 +25,7 @@
 #define CONFLICT_SIZE 4
 #define CONFLICT_MSG 5
 
-#define BUFFER 100000
+#define BUFFER 10000
 
 typedef struct world_cell {
   int type;
@@ -297,7 +297,7 @@ int find_next_positon(int pid, position *actual) {
     c = actual->x * world_size + actual->y;
   }
 
-  
+
   int free_counter = count_free_positions(free_positions);
   int squirrel_counter = count_free_positions(free_squirrels);
   int direction = -1;
@@ -905,7 +905,7 @@ char* receive_input() {
 
 // 
 char* get_movements(int chunk, int start, int end){
-  int i, j, size;
+  int i, j;
   char* movements = (char*) malloc(1); 
   *movements = '\0';
 
@@ -1114,7 +1114,7 @@ void solve_conflict(position* position) {
   }
 }
 
-void apply_conflicts(int pid, char * received, int line_number) {
+void apply_conflicts(char * received, int line_number) {
   char *token, *save;
 
   if ( received == NULL ) return;
@@ -1144,7 +1144,7 @@ void apply_conflicts(int pid, char * received, int line_number) {
   }
 }
 
-void substitute(int pid, char* line, int line_number) {
+void substitute(char* line, int line_number) {
   int i;
 
   // clear the ghost line
@@ -1183,22 +1183,22 @@ void apply_received(int pid, char* received, int process_top) {
   }
 
   if( pid == 0) {
-    apply_conflicts(pid, movement_array, 1);
-    substitute(pid , line, 0);
-    apply_conflicts(pid, top_ghost_line, 0);
+    apply_conflicts(movement_array, 1);
+    substitute(line, 0);
+    apply_conflicts(top_ghost_line, 0);
   } else if ( pid == 1 ) {
-    apply_conflicts(pid, movement_array, chunk_size - 1);
-    substitute(pid , line, chunk_size);
-    apply_conflicts(pid, bottom_ghost_line, chunk_size);
+    apply_conflicts( movement_array, chunk_size - 1);
+    substitute(line, chunk_size);
+    apply_conflicts(bottom_ghost_line, chunk_size);
   } else {
     if(process_top) {
-     apply_conflicts(pid, movement_array, 1);
-      substitute(pid , line, 0);
-      apply_conflicts(pid, top_ghost_line, 0);
+      apply_conflicts(movement_array, 1);
+      substitute(line, 0);
+      apply_conflicts(top_ghost_line, 0);
     } else {
-      apply_conflicts(pid, movement_array, chunk_size);
-      substitute(pid , line, chunk_size + 1);
-      apply_conflicts(pid, top_ghost_line, chunk_size + 1);
+      apply_conflicts(movement_array, chunk_size);
+      substitute(line, chunk_size + 1);
+      apply_conflicts(bottom_ghost_line, chunk_size + 1);
     }
   }
 }
@@ -1222,7 +1222,7 @@ char* receive_conflicts( int from_pid ) {
   return receive_buffer;
 }
 
-void resolve_conflicts(int pid, char* color) {
+void resolve_conflicts(int pid) {
   char* line, *received, *send;
 
   if( pid == 0 ) {
@@ -1234,10 +1234,8 @@ void resolve_conflicts(int pid, char* color) {
     strcat( send, "|");
     strcat( send, line);
 
-    //printf("%s PID %d SENDING to %d\n%s\n", color ,pid, num_processes -1, send);
     send_conflicts( send, num_processes - 1);
     received = receive_conflicts( num_processes - 1 );
-    //printf("%s PID %d RECEIVING FROM %d\n%s\n", color,pid, num_processes -1, received);
 
     apply_received(pid, received, 0);
   } else if( pid == 1 ) {
@@ -1248,10 +1246,8 @@ void resolve_conflicts(int pid, char* color) {
     strcat( send, "|");
     strcat( send, line);
 
-    ////printf("%s PID %d SENDING to %d\n%s\n", color, pid, (pid+1) % num_processes, send );
     send_conflicts( send, (pid + 1) % num_processes );
     received = receive_conflicts( (pid + 1) % num_processes );
-    //printf("%s PID %d RECEIVING FROM %d\n%s\n", color, pid, (pid + 1) % num_processes, received);
 
     apply_received(pid, received, 0);
   } else {
@@ -1263,12 +1259,8 @@ void resolve_conflicts(int pid, char* color) {
     strcat( send, "|");
     strcat( send, line);
 
-    //printf("PID %d SENDING\n%s\n", pid, send);
     send_conflicts( send, pid - 1);
-    //printf("%s PID %d SENDING to %d\n%s\n", color ,pid, pid -1, send);
     received = receive_conflicts( pid - 1 );
-
-    //printf("%s PID %d RECEIVING FROM %d\n%s\n", color,pid, pid -1, received);
     apply_received(pid, received, 1);
 
     // send the bottom
@@ -1280,9 +1272,7 @@ void resolve_conflicts(int pid, char* color) {
     strcat( send, line);
 
     send_conflicts( send, (pid + 1) % num_processes );
-    //printf("%s PID %d SENDING to %d\n%s\n", color, pid, (pid+1) % num_processes, send );
     received = receive_conflicts( (pid + 1) % num_processes );
-    //printf("%s PID %d RECEIVING FROM %d\n%s\n", color, pid, (pid + 1) % num_processes, received);
 
     apply_received(pid, received, 0);
   }
@@ -1311,32 +1301,25 @@ int main(int argc, char *argv[]) {
 
   //only the master reads input
   char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r")) : receive_input();
-//  if(pid == 0) printf("INPUT AT 0\n%s\n", input);
   genesis(input, pid, num_processes);
-  //print_world(pid, "ORIGIANAL");
 
   for( i = 0; i < num_generation; i++) {
     sub_generation(RED_GEN, pid);
-    resolve_conflicts(pid, "RED");
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    //print_world(pid, "AFTER RED GEN");
+    resolve_conflicts(pid);
     clear_ghost_line();
+
     duplicate(pid);
 
     sub_generation(BLK_GEN, pid);
-    resolve_conflicts(pid, "BLACK");
-    MPI_Barrier(MPI_COMM_WORLD);
+    resolve_conflicts(pid);
     clear_ghost_line();
 
     update_generation(pid); 
 
     duplicate(pid);
-
- //print_world(pid, "AFTER BLACK GEN");
   }
 
- //print_world(pid, "END");
+  //print_world(pid, "END");
 
   if ( pid == 0 ) {
     char* receive_all = final_receive();

@@ -543,14 +543,14 @@ int main(int argc, char *argv[]) {
      //printf("========== GEN %d ===== \n", i);
         sub_generation(RED_GEN);
 
-  //      printf("AFTER RED WORLD\n");
-   //     print_world();
+//        printf("AFTER RED WORLD\n");
+//       print_world();
 
         duplicate();
         sub_generation(BLK_GEN);
 
-     //   printf("AFTER BLACK WORLD\n");
-    //    print_world();
+//     printf("AFTER BLACK WORLD\n");
+      //print_world();
 
         update_generation();
     }
