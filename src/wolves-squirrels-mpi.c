@@ -885,6 +885,7 @@ char* send_input(FILE* fp) {
   free(sendBuffer);
   free(before_line);
   free(after_line);
+  free(world_size_c);
 
   fclose(fp);
   return end_result;
@@ -972,6 +973,7 @@ void final_send(int pid) {
   int length = strlen(sendBuffer) + 1;
   MPI_Send(&length, 1, MPI_INT, 0, END_SIZE, MPI_COMM_WORLD);
   MPI_Send(sendBuffer, length, MPI_CHAR, 0, END_MSG, MPI_COMM_WORLD);
+  free(sendBuffer);
 }
 
 /** Process 0 receives the output from all nodes */
@@ -1276,6 +1278,9 @@ void resolve_conflicts(int pid) {
 
     apply_received(pid, received, 0);
   }
+  free(line);
+  free(received);
+  free(send);
 }
 
 int main(int argc, char *argv[]) {
@@ -1334,6 +1339,9 @@ int main(int argc, char *argv[]) {
     elapsed_time += MPI_Wtime();
     printf("TOTAL MPI_ %f\n", elapsed_time);
     printf("%s", result);
+    free(receive_all);
+    free(result);
+    free(receive_0);
   } else {
     final_send(pid);
   }
