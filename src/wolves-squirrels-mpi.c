@@ -1291,9 +1291,6 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank (MPI_COMM_WORLD, &pid);
   MPI_Comm_size (MPI_COMM_WORLD, &num_processes);
 
-  MPI_Barrier(MPI_COMM_WORLD);
-  double elapsed_time = - MPI_Wtime();
-
   wolf_breeding = atoi(argv[2]);
   squirrel_breeding = atoi(argv[3]);
   wolf_starvation = atoi(argv[4]);
@@ -1301,7 +1298,11 @@ int main(int argc, char *argv[]) {
 
   //only the master reads input
   char* input = ( pid == 0 ) ? send_input( fopen(argv[1], "r")) : receive_input();
-  genesis(input, pid, num_processes);
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  double elapsed_time = - MPI_Wtime();
+
+ genesis(input, pid, num_processes);
 
   for( i = 0; i < num_generation; i++) {
     sub_generation(RED_GEN, pid);
@@ -1331,7 +1332,7 @@ int main(int argc, char *argv[]) {
     strcat( result, receive_0);
 
     elapsed_time += MPI_Wtime();
-    printf("FINAL: %f\n", elapsed_time);
+    printf("TOTAL MPI_ %f\n", elapsed_time);
     printf("%s", result);
   } else {
     final_send(pid);

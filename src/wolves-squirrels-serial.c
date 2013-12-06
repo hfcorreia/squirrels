@@ -534,29 +534,20 @@ int main(int argc, char *argv[]) {
     // process input
     genesis( fopen(argv[1], "r") );
 
-    start_t = clock();
 
-//    printf("ORIGINAL WORLD\n");
- //   print_world();
+
+    start_t = clock();
     // process generations
     for( i = 0; i < num_generation; i++) {
-     //printf("========== GEN %d ===== \n", i);
         sub_generation(RED_GEN);
-
-//        printf("AFTER RED WORLD\n");
-//       print_world();
 
         duplicate();
         sub_generation(BLK_GEN);
-
-//     printf("AFTER BLACK WORLD\n");
-      //print_world();
 
         update_generation();
     }
 
     printf("TOTAL SERIAL: %f\n", (double) (clock() - start_t) / CLOCKS_PER_SEC );
-    
     // process output
     output();
     return 0;

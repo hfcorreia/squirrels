@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g
+CFLAGS = 
 SERIAL = wolves-squirrels-serial
 PARALLEL = wolves-squirrels-omp
 MPI = wolves-squirrels-mpi
@@ -8,12 +8,12 @@ OMPFLAG = -fopenmp
 all: mpi parallel serial testgen
 
 mpi: 
-	mpicc -o $(MPI) src/$(MPI).c  -g  -Wall -Wextra 
+	mpicc -o $(MPI) src/$(MPI).c  
 parallel: 
 	$(CC) $(CFLAGS) -o $(PARALLEL) src/$(PARALLEL).c $(OMPFLAG)
 
 serial: 
-	$(CC) $(CFLAGS) -o $(SERIAL) src/$(SERIAL).c -pg
+	$(CC) $(CFLAGS) -o $(SERIAL) src/$(SERIAL).c 
 
 testgen: 
 	$(CC) $(CFLAGS) -o testgen src/testgen.c
